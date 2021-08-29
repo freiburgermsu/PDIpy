@@ -1,0 +1,56 @@
+{
+  "Saureus": {
+    "membrane_chemicals": {
+      "anteiso_C17": {
+        "density (g/L)": {
+          "value": 1,
+          "reference": null
+        },
+        "proportion": {
+          "value": 0.3,
+          "reference": null,
+          "notes": "Fatty acids constitute approximately 60% of membrane volume"
+        },
+        "formula": "C18_H35_O2",
+        "mw": 283.476
+      },
+      "anteiso_C15": {
+        "density (g/L)": {
+          "value": 1,
+          "reference": null
+        },
+        "proportion": {
+          "value": 0.3,
+          "reference": null,
+          "notes": "Fatty acids constitute approximately 60% of membrane volume"
+        },
+        "formula": "C16_H31_O2",
+        "mw": 255.422
+      }
+    },
+    "shape": {
+      "value": "sphere",
+      "reference": null
+    },
+    "membrane_thickness (nm)": {
+      "value": 50,
+      "reference": null
+    },
+    "cell_mass (pg)": {
+      "value": 1,
+      "reference": null
+    },
+    "cell_volume (fL)": {
+      "value": 1,
+      "reference":  null
+    },
+    "stop_biomass_threshold (%)": {
+      "value": 0.05,
+      "reference": null
+    },
+    "death_threshold (%)": {
+      "value": 0.1,
+      "reference": null
+    }
+  }
+}

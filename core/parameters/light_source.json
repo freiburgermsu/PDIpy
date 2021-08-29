@@ -1,0 +1,15 @@
+{
+  "incandescent": {
+    "visible_proportion": {
+      "value": 0.1,
+      "reference": "Macisaac et al., 1999"
+    }
+  },
+  "LED": {
+    "visible_proportion": {
+      "value": 0.5,
+      "reference": null,
+      "notes": "~80% more energy efficient and thus 5x more visible light per energy relative to incandescent bulbs"
+    }
+  }
+}
