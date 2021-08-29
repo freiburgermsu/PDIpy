@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
-with open('README.rst') as f:
+with open('README.md') as f:
     readme = f.read()
-    
+
 with open('LICENSE') as f:
     license = f.read()
 
@@ -11,7 +11,7 @@ setup(
   packages = find_packages(where = "core"),
   version = '0.0.1',
   license = license,
-  description = 'A tool for calculating cellular oxidation and death via photodynamic inactivation', 
+  description = "A tool for calculating cellular oxidation and death via photodynamic inactivation.", 
   long_description = readme,
   long_description_content_type = "text/x-rst",
   author = 'Andrew Freiburger',               
