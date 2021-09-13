@@ -2,9 +2,11 @@
 from scipy.constants import femto, pico, nano, micro, milli, kilo, liter, N_A, h, c, minute
 from math import pow, pi, cos, radians
 from chemicals.elements import periodic_table
+from datetime import date
 import json
 import sys
 import re
+import os
 
 class PDIBacterialPkg():
     def __init__(self):
@@ -17,9 +19,9 @@ class PDIBacterialPkg():
         
         # initial parameters
         self.parameters['time'] = 0
-        self.parameters['singlet_oxygen_diffusion_distance'] = 80 * nano                        # Moan1990 
+        self.parameters['singlet_oxygen_diffusion_distance'] = 80 * nano       # Moan1990 
         self.parameters['oxidation_angle'] = 5           # degrees
-        
+        self.parameters['cwd'] = re.sub('(?!\\\\)(\w+\.py)', '', __file__)
 
     def define_bacterium(self, bacterial_specie):
         """ Define the model bacteria PDI and is biological parameters
@@ -29,7 +31,8 @@ class PDIBacterialPkg():
         self.results['biofilm_growth'] = True
         
         # load the bacterial parameters
-        bacterium = json.load(open(f'./parameters/{bacterial_specie}.json'))[bacterial_specie]
+        self.parameters['bacterial_specie'] = bacterial_specie
+        bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['cwd'], bacterial_specie)))[bacterial_specie]
 
         self.membrane_chemicals = bacterium['membrane_chemicals']
         self.cell_shape = bacterium['shape']['value']
@@ -45,7 +48,8 @@ class PDIBacterialPkg():
             Used:     define()
         """ 
         # load the photosensitizer parameters
-        self.photosensitizer = json.load(open('./parameters/photosensitizers.json'))[porphyrin_selection]
+        self.parameters['porphyrin_selection'] = porphyrin_selection
+        self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['cwd'])))[porphyrin_selection]
         
         self.parameters['soret'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
         self.parameters['q'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
@@ -59,7 +63,7 @@ class PDIBacterialPkg():
         """ 
         self.parameters['visible'] = {'upper': 780 * nano, 'lower': 390 * nano}
 
-        light_parameters = json.load(open('./parameters/light_source.json'))
+        light_parameters = json.load(open('{}/parameters/light_source.json'.format(self.parameters['cwd'])))
         self.parameters['visible_proportion'] = light_parameters[light_source]['visible_proportion']['value']
         
         if irradiance is not None:
@@ -105,17 +109,16 @@ class PDIBacterialPkg():
         average_excitation_wavelength = (self.parameters['q']['upper'] + self.parameters['soret']['lower']) / 2
         joules_per_photon = (h * c) / average_excitation_wavelength
         photons_per_second = effective_excitation_light_watts / joules_per_photon
+        self.variables['photons_per_timestep'] = photons_per_second * seconds_per_timestep
 
         # singlet oxygen calculations
         '''so_from_light = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
         mw_molecular_oxygen = periodic_table.O.MW * 2 * kilo          #mg / mole
-        dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted to only consider oxygen in the water in the vacinity of the photosensitizer, which is geometrically limited to the material surface. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume. 
-        
+        dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted to only consider oxygen in the water in the vacinity of the photosensitizer, which is geometrically limited to the material surface. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume.       
         self.variables['molecules_dissolved_oxygen'] = dissolved_oxygen_concentration / mw_molecular_oxygen
-        self.variables['quantum_yield'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
-        self.variables['photons_per_timestep'] = photons_per_second * seconds_per_timestep
         
         # define the kinetic parameters
+        self.variables['quantum_yield'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
         self.variables['photon_collisions'] = photon_collision_proportion
         self.variables['healing'] = healing_kinetics
         self.variables['k'] = kinetic_constant
@@ -161,18 +164,15 @@ class PDIBacterialPkg():
             self.variables['fa15_conc'] = c15_oxidized_ppm / self.membrane_chemicals['anteiso_C15']['mw']
 
 
-    def kinetic_calculation(self, end_time):
+    def kinetic_calculation(self, end_time, omex_file_path, omex_file_name = None):
         """ Execute the kinetic calculations in Tellurium
             Used:    simulate()
         """
         import tellurium
         
         # define the first equation
-        ps = self.variables['porphyrin_conc']
+        k_so = self.variables['quantum_yield'] * self.variables['photon_collisions'] * self.variables['photons_per_timestep'] * self.variables['porphyrin_conc']
         mo = self.variables['molecules_dissolved_oxygen']
-        hv = self.variables['photons_per_timestep']
-        quantum_yield = self.variables['quantum_yield']
-        photon_collisions = self.variables['photon_collisions']
         
         # define the second equation
         k = self.variables['k']
@@ -188,27 +188,22 @@ class PDIBacterialPkg():
         model = (f'''
           model pdi_oxidation
             # expressions
-            o -> so; qy*pc*o*hv*ps 
-            so + fa17 -> ofa; {k}*so*fa17 - hk*ofa  # time      # the aggregated photons / second must be programmatically inserted into the rate expression         
-            so + fa15 -> ofa; {k}*so*fa15 - hk*ofa
+            o -> so;  {k_so}*o
+            so + fa17 -> ofa; {k}*so*fa17 - {healing_kinetics}*ofa  # time      # the aggregated photons / second must be programmatically inserted into the rate expression         
+            so + fa15 -> ofa; {k}*so*fa15 - {healing_kinetics}*ofa
 
             # define the first expression 
-            ps = {ps}
             o = {mo};
-            hv = {hv};
-            qy = {quantum_yield};
-            pc = {photon_collisions};
             
             # define the second expression
             so = 0;
             fa17 = {fa17};
             fa15 = {fa15};
-            hk = {healing_kinetics};
             
             # define constants
             biofilm = {biofilm_threshold};
             vitality = {death_threshold};
-            oxidation = ofa / (ofa + fa15 + fa17);
+            oxidation := ofa / (ofa + fa15 + fa17);
             
           end
         ''')
@@ -227,9 +222,17 @@ class PDIBacterialPkg():
         '''
 
         # create, execute, and export an OMEX file
-        inline_omex = '\n'.join([model, phrasedml_str])
+        inline_omex = '\n'.join([model, phrasedml_str])               
         tellurium.executeInlineOmex(inline_omex)
-        tellurium.exportInlineOmex(inline_omex, './test_omex_files/test.omex')
+        
+        if omex_file_name is None:
+            count = 0
+            omex_file_name = '_'.join([str(date.today()), self.parameters['porphyrin_selection'], self.parameters['bacterial_specie'], str(count)])
+            while os.path.exists(omex_file_name):
+                count += 1
+                omex_file_name = '_'.join([str(date.today()), self.parameters['porphyrin_selection'], self.parameters['bacterial_specie'], str(count)])
+            omex_file_name += '.omex'
+        tellurium.exportInlineOmex(inline_omex, os.path.join(omex_file_path, omex_file_name))
               
 
     def define(self, bacterial_species, porphyrin_selection, porphyrin_conc, light_source, wattage):
@@ -244,13 +247,13 @@ class PDIBacterialPkg():
         # parameterize the simulation
         self.define_bacterium(bacterial_species)
         self.define_porphyrin(porphyrin_conc, porphyrin_selection)
-        irradiance = self.define_light(light_source, wattage)
+        light = self.define_light(light_source, wattage = wattage)
         
         self.parameters['defined'] = True
         
-        return irradiance
+        return light
         
-    def simulate(self, light, end_time, timestep, kinetc_constant, photon_collision_proportion):
+    def simulate(self, light, timestep, kinetc_constant, photon_collision_proportion, omex_file_path, end_time):
         ''' Execute the model for this simulation
             Arguments (type, units):
                 end_time (float, minutes) = the conclusion time for the simulation in minutes
@@ -263,4 +266,4 @@ class PDIBacterialPkg():
         else:
             self.singlet_oxygen_calculations(timestep, kinetc_constant, photon_collision_proportion)
             self.geometric_oxidation()
-            self.kinetic_calculation(end_time)
+            self.kinetic_calculation(end_time, omex_file_path)

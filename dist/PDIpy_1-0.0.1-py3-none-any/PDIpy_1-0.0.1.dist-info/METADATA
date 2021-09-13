@@ -1,0 +1,21 @@
+Metadata-Version: 2.1
+Name: PDIpy-1
+Version: 0.0.1
+Summary: A tool for calculating cellular oxidation and death via photodynamic inactivation.
+Home-page: https://github.com/freiburgermsu/PDIpy
+Author: Andrew Freiburger
+Author-email: andrewfreiburger@gmail.com
+License: GNU
+Keywords: antibacterial,photodynamic,biophysics
+Platform: UNKNOWN
+Description-Content-Type: text/markdown
+Requires-Dist: chemicals
+Requires-Dist: scipy
+
+PDIpy Module Repository
+=============================
+
+This module simulation photodynamic inactivation for bacteria.
+
+-----------------------------------------------------------------
+

@@ -1,33 +1,30 @@
+# -*- coding: utf-8 -*-
 from setuptools import setup, find_packages
+from glob import glob
 
-with open('README.rst') as f:
-    readme = f.read()
+with open('README.rst') as file:
+    readme = file.read()
 
 with open('LICENSE') as f:
     license = f.read()
     
 setup(
-  name = 'PDIpy',      
-  packages = find_packages(where = "core"),
+  name = 'PDIpy_1',      
+  package_dir = {'':'pdipy'},
+  packages = find_packages(),
+  package_data = {'pdipy': ['parameters/*.json']},  # glob here
   version = '0.0.1',
-  license = license,
+  license = 'GNU',
   description = "A tool for calculating cellular oxidation and death via photodynamic inactivation.", 
   long_description = readme,
-  long_description_content_type = "text/x-rst",
+  long_description_content_type = "text/markdown",
   author = 'Andrew Freiburger',               
   author_email = 'andrewfreiburger@gmail.com',
   url = 'https://github.com/freiburgermsu/PDIpy',   
-  # download_url = 'https://github.com/user/reponame/archive/v_01.tar.gz', 
+#   download_url = 'https://github.com/user/reponame/archive/v_01.tar.gz', 
   keywords = ['antibacterial', 'photodynamic', 'biophysics'],   
   install_requires=[            
           'chemicals',
           'scipy',
-      ],
-  classifiers=[
-    'Development Status :: 3 - Alpha',
-    'Intended Audience :: Developers and Users',
-    'Topic :: Software Development :: Build Tools',
-    'License :: OSI Approved :: GNU License',
-    'Programming Language :: Python :: >=3',
-  ],
+      ]
 )
