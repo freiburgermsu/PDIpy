@@ -182,7 +182,7 @@ class PDIBacterialPkg():
             # define the light watts
             effective_visible_light_watts = self.parameters['watts'] * self.parameters['visible_proportion']
             visible_region = self.parameters['visible']['upper'] - self.parameters['visible']['lower']
-            excitation_visible_proportion = ((self.parameters['q']['upper'] - self.parameters['q']['lower']) + (self.parameters['soret']['upper'] - self.parameters['soret']['lower'])) / visible_region
+            excitation_visible_proportion = ((self.parameters['soret']['upper'] - self.parameters['soret']['lower'])) / visible_region
             effective_excitation_light_watts = excitation_visible_proportion * effective_visible_light_watts  # homogeneous light intesity throughout the visible spectrum is assumed
 #             print(effective_excitation_light_watts)
             
@@ -202,8 +202,8 @@ class PDIBacterialPkg():
             estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time'] * self.variables['photon_collision_proportion']
             
             if verbose:
-                print('molecular oxygen molecules: ', self.variables['molecules_dissolved_oxygen'])
-                print('excited photosensitizer molecules: ', estimated_excited_photosensitizers)
+                print('molecular oxygen molecules: ', sci_notation(self.variables['molecules_dissolved_oxygen'], sigfigs))
+                print('excited photosensitizer molecules: ', sci_notation(estimated_excited_photosensitizers, sigfigs))
 
             # define the kinetic parameters
             self.variables['quantum_yield'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
