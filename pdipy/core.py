@@ -3,11 +3,16 @@ from scipy.constants import femto, pico, angstrom, nano, micro, milli, kilo, lit
 from math import pow, pi, sin, cos, radians
 from chemicals.elements import periodic_table
 from to_precision import sci_notation
+from matplotlib import pyplot
 from datetime import date
+import tellurium
+import pandas
 import json
 import sys
 import re
 import os
+
+pandas.set_option('max_colwidth', None)
 
 
 def average(num_1, num_2 = None):
@@ -36,7 +41,7 @@ sigfigs = 2
 
 
 class PDIBacterialPkg():
-    def __init__(self):
+    def __init__(self, verbose = False):
         """ Define the initial PDI and biological parameters
         """        
         # define base organizations
@@ -45,10 +50,10 @@ class PDIBacterialPkg():
         self.results = {}
         
         # initial parameters
-        self.parameters['time'] = 0
         self.parameters['singlet_oxygen_diffusion_distance'] = 80 * nano       # Moan1990 
         self.parameters['oxidation_angle'] = 5           # degrees
-        self.parameters['cwd'] = re.sub('(?!\\\\)(\w+\.py)', '', __file__)
+        self.parameters['root_path'] = re.sub('(\w+\.py)', '', __file__)
+        self.verbose = verbose
 
     def define_bacterium(self, bacterial_specie):
         """ Define the model bacteria PDI and is biological parameters
@@ -59,15 +64,15 @@ class PDIBacterialPkg():
         
         # load the bacterial parameters
         self.parameters['bacterial_specie'] = bacterial_specie
-        bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['cwd'], bacterial_specie)))[bacterial_specie]
+        bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['root_path'], bacterial_specie)))[bacterial_specie]
 
         self.membrane_chemicals = bacterium['membrane_chemicals']
         self.cell_shape = bacterium['shape']['value']
         self.parameters['stop_biofilm_threshold'] = bacterium['stop_biomass_threshold (%)']['value']
         self.parameters['oxidized_death_threshold'] = bacterium['death_threshold (%)']['value']
-        self.membrane_thickness = bacterium['membrane_thickness (nm)']['value'] * nano                    
-        self.cell_mass = bacterium['cell_mass (pg)']['value'] * pico
-        self.cell_volume = bacterium['cell_volume (fL)']['value'] * femto  / liter
+        self.membrane_thickness = bacterium['membrane_thickness (nm)']['value'] * nano        # meters                 
+        self.cell_mass = bacterium['cell_mass (pg)']['value'] * pico                          # grams
+        self.cell_volume = bacterium['cell_volume (fL)']['value'] * femto  / liter            #cubic meters
 
 
     def define_porphyrin(self, porphyrin_conc, porphyrin_selection = 'A3B_4Zn'):
@@ -76,7 +81,7 @@ class PDIBacterialPkg():
         """ 
         # load the photosensitizer parameters
         self.parameters['porphyrin_selection'] = porphyrin_selection
-        self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['cwd'])))[porphyrin_selection]
+        self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['root_path'])))[porphyrin_selection]
         
         self.parameters['soret'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
         self.parameters['q'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
@@ -90,7 +95,7 @@ class PDIBacterialPkg():
         """ 
         self.parameters['visible'] = {'upper': 780 * nano, 'lower': 390 * nano}
 
-        light_parameters = json.load(open('{}/parameters/light_source.json'.format(self.parameters['cwd'])))
+        light_parameters = json.load(open('{}/parameters/light_source.json'.format(self.parameters['root_path'])))
         self.parameters['visible_proportion'] = light_parameters[light_source]['visible_proportion']['value']
         
         # define the available light
@@ -125,7 +130,7 @@ class PDIBacterialPkg():
 #             self.parameters['light_watts'] = wattage
 
 
-    def define_photosensitizer_volume(self, molecular_proportion = None, verbose = False):
+    def define_photosensitizer_volume(self, molecular_proportion = None):
         if molecular_proportion is not None:
             self.parameters['molecular_proportion'] = molecular_proportion
         else:
@@ -148,32 +153,32 @@ class PDIBacterialPkg():
                 # calculate the proportion of well volume that is constituted by the molecular volume, in meters
                 molecular_volume = sci_notation((float(length) * angstrom)**2 * (float(thickness) * angstrom), sigfigs)
                 self.parameters['well_solution_volume'] = 0.75 * micro * liter
-                num_photosensitizers_well = (milli*N_A)*(liter*milli)/96 # 1 millimolar, with one 1 mL, per one of 96 wells
+                num_photosensitizers_well = (milli*N_A)*(liter*milli)/96                  # 1 millimolar, with one 1 mL, per one of 96 wells
                 self.variables['photon_collision_proportion'] = num_photosensitizers_well*float(molecular_volume) / self.parameters['well_solution_volume']
 
-                if verbose:
+                if self.verbose:
                     print(f'The center porphyrin object is {center_porphyrin_length} angstroms')
                     print(f'The benzyl extension is {sp2_extension} angstroms')
                     print(f'The diazirine is {sp3_diazirine} angstroms')
                     print(f'The molecular length is {length} angstroms')
                     print(f'The molecular thickness is {thickness} angstroms')
                     print(f'The molecular volume is {molecular_volume} cubic meters')
-                    print('The photosensitizer volume proportion is {proportion}'.format(self.variables['photon_collision_proportion']))
+                    print('The photosensitizer volume proportion is {}'.format(self.variables['photon_collision_proportion']))
             else:
                 print('--> ERROR: The {} porphyrin selection is not defined.'.format(self.parameters['porphyrin_selection']))
+                
+        self.defined_model = True
 
 
-    def singlet_oxygen_calculations(self, timestep, total_time, kinetic_constant, healing_kinetics = 5, verbose = True):
+    def singlet_oxygen_calculations(self, timestep, total_time, kinetic_constant, initial_time = 0, healing_kinetics = 5):
         """ Calculate the intermediates and values that yield the [singlet_oxygen] from PDI
             Used:    simulate()
         """
-        try:
-            if self.parameters['defined']:
-                pass
-        except:
+        if not self.defined_model:
             import sys
             sys.exit('ERROR: The model must first be defined.')
             
+        self.parameters['initial_time'] = initial_time
         self.parameters['total_time'] = total_time * minute
         self.parameters['timestep'] = timestep
         seconds_per_timestep = self.parameters['timestep'] * minute            
@@ -201,7 +206,7 @@ class PDIBacterialPkg():
             self.variables['molecules_dissolved_oxygen'] = dissolved_oxygen_concentration / mw_molecular_oxygen * self.parameters['well_solution_volume'] * N_A
             estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time'] * self.variables['photon_collision_proportion']
             
-            if verbose:
+            if self.verbose:
                 print('molecular oxygen molecules: ', sci_notation(self.variables['molecules_dissolved_oxygen'], sigfigs))
                 print('excited photosensitizer molecules: ', sci_notation(estimated_excited_photosensitizers, sigfigs))
 
@@ -245,29 +250,29 @@ class PDIBacterialPkg():
             singlet_oxygen_interaction_radius = cell_radius + self.parameters['singlet_oxygen_diffusion_distance']
 #             membrane_solution_interface_volume = shell_volume(singlet_oxygen_interaction_radius, cell_radius)
 
-            c17_oxidized_volume = membrane_volume * self.membrane_chemicals['anteiso_C17']['proportion']['value'] * oxidized_membrane_volume_ratio  # M^3 
-            c17_oxidized_ppm = c17_oxidized_volume * self.membrane_chemicals['anteiso_C17']['density (g/L)']['value'] * milli / liter
-            c15_oxidized_volume = membrane_volume * self.membrane_chemicals['anteiso_C15']['proportion']['value'] * oxidized_membrane_volume_ratio  # M^3
-            c15_oxidized_ppm = c15_oxidized_volume * self.membrane_chemicals['anteiso_C15']['density (g/L)']['value'] * milli / liter
+            self.variables['bcfa_conc'] = 0
+            if 'bcfa_conc' in self.membrane_chemicals:
+                self.variables['bcfa_conc'] = self.membrane_chemicals['bcfa']['concentration']
+            else:
+                for chemical in self.membrane_chemicals:
+                    if re.search('anteiso', chemical):
+                        oxidized_volume = membrane_volume * self.membrane_chemicals[chemical]['proportion']['value'] * oxidized_membrane_volume_ratio  # M^3 
+                        oxidized_ppm = oxidized_volume * self.membrane_chemicals[chemical]['density (g/L)']['value'] * milli / liter
+                        
+                        self.variables['bcfa_conc'] += oxidized_ppm  / self.membrane_chemicals[chemical]['mw']
 
-            self.variables['fa17_conc'] = c17_oxidized_ppm  / self.membrane_chemicals['anteiso_C17']['mw']
-            self.variables['fa15_conc'] = c15_oxidized_ppm / self.membrane_chemicals['anteiso_C15']['mw']
 
-
-    def kinetic_calculation(self, omex_file_path, omex_file_name = None):
+    def kinetic_calculation(self):
         """ Execute the kinetic calculations in Tellurium
             Used:    simulate()
-        """
-        import tellurium
-        
+        """        
         # define the first equation
         k_so = self.variables['quantum_yield'] * self.variables['photons_per_timestep'] * self.variables['porphyrin_conc'] * self.variables['photon_collision_proportion']
         mo = self.variables['molecules_dissolved_oxygen']
         
         # define the second equation
         k = self.variables['k']
-        fa17 = self.variables['fa17_conc']
-        fa15 = self.variables['fa15_conc']
+        bcfa = self.variables['bcfa_conc']
         
         # define constants
         healing_kinetics = self.variables['healing']
@@ -275,57 +280,125 @@ class PDIBacterialPkg():
         death_threshold = self.parameters['oxidized_death_threshold']
 
         # define the SBML model
-        model = (f'''
+        self.model = (f'''
           model pdi_oxidation
             # expressions
-            o -> so;  {k_so}*o
-            so + fa17 -> ofa; {k}*so*fa17 - {healing_kinetics}*ofa  # time      # the aggregated photons / second must be programmatically inserted into the rate expression         
-            so + fa15 -> ofa; {k}*so*fa15 - {healing_kinetics}*ofa
+            o -> so;  {k_so}*o*time
+            so + bcfa -> ofa; {k}*so*bcfa*time - {healing_kinetics}*ofa*time  # time      # the aggregated photons / second must be programmatically inserted into the rate expression         
 
             # define the first expression 
-            o = {mo};
+            o = {mo}
             
             # define the second expression
-            so = 0;
-            fa17 = {fa17};
-            fa15 = {fa15};
+            so = 0
+            ofa = 0
+            bcfa = {bcfa}
             
             # define constants
             biofilm = {biofilm_threshold};
             vitality = {death_threshold};
-            oxidation := ofa / (ofa + fa15 + fa17);
+            oxidation := ofa / (ofa + bcfa);
             
           end
-        ''')
-        tellurium_model = tellurium.loada(model)
-        print(tellurium_model.getCurrentAntimony())
-        print('\nCurrent integrator:', '\n', tellurium_model.integrator)
-        
-        
+        ''')       
         # define the SEDML plot
         total_points = self.parameters['total_time'] / self.parameters['timestep'] 
-        phrasedml_str = '''
+        self.phrasedml_str = '''
           model1 = model "pdi_oxidation"
-          sim1 = simulate uniform(0, {}, {})
+          sim1 = simulate uniform({}, {}, {})
           task1 = run sim1 on model1
-          plot "Figure 1" time vs biofilm, vitality, oxidation, so, fa17, fa15, ofa
-        '''.format(self.parameters['total_time'], total_points)
-
-        # create, execute, and export an OMEX file
-        inline_omex = '\n'.join([model, phrasedml_str])               
-        tellurium.executeInlineOmex(inline_omex)
+          plot "Oxidation proportion of prokaryotic membrane fatty acids" time vs biofilm, vitality, oxidation
+        '''.format(self.parameters['initial_time'], self.parameters['total_time'], total_points)
         
-        if omex_file_name is None:
-            count = 0
-            omex_file_name = '_'.join([str(date.today()), self.parameters['porphyrin_selection'], self.parameters['bacterial_specie'], str(count)])
-            while os.path.exists(omex_file_name):
-                count += 1
-                omex_file_name = '_'.join([str(date.today()), self.parameters['porphyrin_selection'], self.parameters['bacterial_specie'], str(count)])
-            omex_file_name += '.omex'
-        tellurium.exportInlineOmex(inline_omex, os.path.join(omex_file_path, omex_file_name))
-              
+        # execute the figure data
+        tellurium_model = tellurium.loada(self.model)            
+        result = tellurium_model.simulate(self.parameters['initial_time'], int(self.parameters['total_time']), int(total_points))
+        self.result_df = pandas.DataFrame(result)
+        self.result_df.index = self.result_df[0]
+        del self.result_df[0]
+        self.result_df.index.name = 'Time (s)'
+        self.result_df.columns = ['[o]', '[so]', '[bcfa]', '[ofa]']
+        
+        if self.verbose:
+            print(tellurium_model.getCurrentAntimony())
+            print('\nCurrent integrator:', '\n', tellurium_model.integrator)
+            display(self.result_df)
+            
+        return self.result_df
 
-    def define(self, bacterial_species, porphyrin_selection, porphyrin_conc, light_source, irradiance = None, well_surface_area = 1, exposure = None, simulation_time = None, molecular_proportion = None, verbose = False):
+        
+    def export(self, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (s)', y_label = 'oxidation proportion', biofilm_threshold = 0.05, vitality_threshold = 0.1, ):
+        # parse the simulation results
+        x_values = []
+        y_values = []
+        for index, point in self.result_df.iterrows():
+            x_values.append(index)
+            oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[bcfa]']) 
+            y_values.append(oxidation_proportion)
+        biofilm_threshold = [biofilm_threshold for x in range(len(x_values))]
+        vitality_threshold = [vitality_threshold for x in range(len(x_values))]
+        
+        # define the simulation_path
+        self.simulation_path = simulation_path
+        if self.simulation_path is None:
+            count = 0
+            self.simulation_path = '_'.join([str(date.today()), self.parameters['porphyrin_selection'], self.parameters['bacterial_specie'], str(count)])
+            while os.path.exists(self.simulation_path):
+                count += 1
+                self.simulation_path = '_'.join([str(date.today()), self.parameters['porphyrin_selection'], self.parameters['bacterial_specie'], str(count)])
+            self.simulation_path = os.path.join(os.getcwd(), self.simulation_path)        
+        os.mkdir(self.simulation_path)
+        
+        # create and export the OMEX file
+        inline_omex = '\n'.join([self.model, self.phrasedml_str])  
+        omex_file_name = 'input.omex'
+        tellurium.exportInlineOmex(inline_omex, os.path.join(self.simulation_path, omex_file_name))
+        
+        # export the figure
+        figure_path = os.path.join(self.simulation_path, 'output.svg')
+        pyplot.rcParams['figure.figsize'] = (15, 9)
+        pyplot.rcParams['figure.dpi'] = 150
+        figure, ax = pyplot.subplots()
+        ax.plot(x_values, y_values, label = 'oxidation_proportion')
+        ax.plot(x_values, biofilm_threshold, label = 'biofilm_thershold')
+        ax.plot(x_values, vitality_threshold, label = 'vitality_threshold')
+        ax.set_ylabel(y_label)
+        ax.set_xlabel(x_label)
+        ax.set_title(figure_title)
+        ax.legend()
+        figure.savefig(figure_path)
+        figure.show()
+        
+        # define a table of parameters
+        parameters = {'parameter':[], 'value':[]}
+        parameters['parameter'].append('simulation_path')
+        parameters['value'].append(self.simulation_path)
+        for parameter in self.parameters:
+            parameters['parameter'].append(parameter)
+            parameters['value'].append(self.parameters[parameter])
+        parameters_table = pandas.DataFrame(parameters)
+        if self.verbose:
+            display(parameters_table)
+        
+        parameters_path = os.path.join(self.simulation_path, 'parameters.csv')
+        parameters_table.to_csv(parameters_path)
+        
+        # define a table of variables
+        variables = {'variable':[], 'value':[]}
+        variables['variable'].append('simulation_path')
+        variables['value'].append(self.simulation_path)
+        for variable in self.variables:
+            variables['variable'].append(variable)
+            variables['value'].append(self.variables[variable])
+        variables_table = pandas.DataFrame(variables)
+        if self.verbose:
+            display(variables_table)
+        
+        variables_path = os.path.join(self.simulation_path, 'variables.csv')
+        variables_table.to_csv(variables_path)
+             
+
+    def define(self, bacterial_species, porphyrin_selection, porphyrin_conc, light_source, irradiance = None, well_surface_area = 1, exposure = None, simulation_time = None, molecular_proportion = None):
         """ Parameterize the model 
             Arguments (type, units):
                 bacterial_species (string, \capitalGenus\fullLowerSpecies) = the selected bacterial species for study 
@@ -338,13 +411,13 @@ class PDIBacterialPkg():
         self.define_bacterium(bacterial_species)
         self.define_porphyrin(porphyrin_conc, porphyrin_selection)
         light = self.define_light(light_source, irradiance, well_surface_area, exposure, simulation_time)
-        self.define_photosensitizer_volume(molecular_proportion = None, verbose = False)
+        self.define_photosensitizer_volume(molecular_proportion = None)
         
-        self.parameters['defined'] = True
+        self.defined_model = True
         
         return light
         
-    def simulate(self, light, timestep, kinetc_constant, omex_file_path, total_time):
+    def simulate(self, timestep, total_time, kinetc_constant, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'time', y_label = 'oxidation proportion'):
         ''' Execute the model for this simulation
             Arguments (type, units):
                 end_time (float, minutes) = the conclusion time for the simulation in minutes
@@ -352,9 +425,12 @@ class PDIBacterialPkg():
                 kinetic_constant (float, ___) = the kinetic constant for the oxidation of fatty acids via singlet oxygen
         '''
         # execute the simulation
-        if light == 'watts':
+        if 'watts' in self.parameters:
             self.singlet_oxygen_calculations(timestep, total_time, kinetc_constant)
             self.geometric_oxidation()
-            self.kinetic_calculation(omex_file_path)
+            raw_data = self.kinetic_calculation()
+            self.export(simulation_path, figure_title, x_label, y_label, )
         else:
             print(f'--> ERROR: The {light} light source is not supported by the code')
+            
+        return raw_data
