@@ -1,0 +1,13 @@
+LICENSE
+MANIFEST.in
+README.rst
+setup.py
+PDIpy.egg-info/PKG-INFO
+PDIpy.egg-info/SOURCES.txt
+PDIpy.egg-info/dependency_links.txt
+PDIpy.egg-info/top_level.txt
+pdipy/__init__.py
+pdipy/core.py
+pdipy/parameters/Saureus.json
+pdipy/parameters/light_source.json
+pdipy/parameters/photosensitizers.json

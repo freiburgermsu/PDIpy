@@ -1,0 +1,10 @@
+,variable,value
+0,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\2021-10-19_A3B_4Zn_Saureus_8
+1,porphyrin_conc,1.0
+2,photon_collision_proportion,1.3382535022222221e-06
+3,photons_per_timestep,2257685108622114.0
+4,molecules_dissolved_oxygen,127034295442.32909
+5,quantum_yield,0.48
+6,healing,5
+7,k,1
+8,bcfa_conc,2.421818023735304e-20

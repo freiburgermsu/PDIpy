@@ -1,5 +1,5 @@
 # import libraries
-from scipy.constants import femto, pico, angstrom, nano, micro, milli, kilo, liter, N_A, h, c, minute
+from scipy.constants import femto, pico, angstrom, nano, micro, milli, centi, kilo, liter, N_A, h, c, minute
 from math import pow, pi, sin, cos, radians
 from chemicals.elements import periodic_table
 from to_precision import sci_notation
@@ -41,7 +41,7 @@ sigfigs = 2
 
 
 class PDIBacterialPkg():
-    def __init__(self, verbose = False):
+    def __init__(self, solution_volume = 0.75, verbose = False):
         """ Define the initial PDI and biological parameters
         """        
         # define base organizations
@@ -53,6 +53,7 @@ class PDIBacterialPkg():
         self.parameters['singlet_oxygen_diffusion_distance'] = 80 * nano       # Moan1990 
         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = re.sub('(\w+\.py)', '', __file__)
+        self.parameters['well_solution_volume'] = solution_volume * micro * liter
         self.verbose = verbose
 
     def define_bacterium(self, bacterial_specie):
@@ -86,8 +87,8 @@ class PDIBacterialPkg():
         self.parameters['soret'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
         self.parameters['q'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
 
-        self.variables['porphyrin_conc'] = float(porphyrin_conc)
-        
+        self.variables['porphyrin_ppm'] = porphyrin_conc
+        self.variables['porphyrin_moles'] = porphyrin_conc / self.photosensitizer['mw']['value'] * self.parameters['well_solution_volume']/liter
 
     def define_light(self, light_source, irradiance = None, well_surface_area = 1, exposure = None, simulation_time = None, lux = None, lumens = None, wattage = None, distance = None, reflection = False):
         """ Define the PDI light source
@@ -130,32 +131,48 @@ class PDIBacterialPkg():
 #             self.parameters['light_watts'] = wattage
 
 
-    def define_photosensitizer_volume(self, molecular_proportion = None):
+    def define_photosensitizer_volume(self, molecular_proportion = None, porphyrin_per_square_cm = None):
         if molecular_proportion is not None:
             self.parameters['molecular_proportion'] = molecular_proportion
         else:
             # determine the individual molecular components
             if self.parameters['porphyrin_selection'] == 'A3B_4Zn':
+                # calculate the volume of photosensitizing region in the molecule
                 center_porphyrin_length = sci_notation(2*(chemical_dimensions['bond']['c-c']*(2*cos(radians(chemical_dimensions['angle']['sp2']-90))+cos(radians(180-chemical_dimensions['angle']['sp2'])))), sigfigs)
-
                 sp2_extension = sci_notation(chemical_dimensions['bond']['c-c'] * (2 + cos(radians(180-chemical_dimensions['angle']['sp2']))) + chemical_dimensions['bond']['c-n'] * cos(radians(180-chemical_dimensions['angle']['sp2'])) + chemical_dimensions['bond']['c-n'], sigfigs)
-
-                sp3_diazirine = sci_notation(chemical_dimensions['bond']['c-c']*cos(radians(chemical_dimensions['angle']['sp3']-90)) + 2*chemical_dimensions['bond']['c-c']*(1+cos(radians(180-chemical_dimensions['angle']['sp2']))) + chemical_dimensions['bond']['c-c']*sin(radians(chemical_dimensions['angle']['sp3']-90)) + chemical_dimensions['bond']['c-f'], sigfigs)
+                sp3_diazirine = 0
+#                 sp3_diazirine = sci_notation(chemical_dimensions['bond']['c-c']*cos(radians(chemical_dimensions['angle']['sp3']-90)) + 2*chemical_dimensions['bond']['c-c']*(1+cos(radians(180-chemical_dimensions['angle']['sp2']))) + chemical_dimensions['bond']['c-c']*sin(radians(chemical_dimensions['angle']['sp3']-90)) + chemical_dimensions['bond']['c-f'], sigfigs)
+#                 min_thickness = 2*chemical_dimensions['bond']['c-f']*sin(radians(chemical_dimensions['angle']['sp3']))
+#                 max_thickness = 2*float(sp3_diazirine)
+#                 print('min', min_thickness, 'max', max_thickness)
+#                 thickness = sci_notation(average(min_thickness, max_thickness), sigfigs)
 
                 diazirine_length = float(sp2_extension) + float(sp3_diazirine)
-
-                # determine the molecular dimensions
                 length = sci_notation(float(center_porphyrin_length) + 2*diazirine_length, sigfigs)
-                min_thickness = 2*chemical_dimensions['bond']['c-f']*sin(radians(chemical_dimensions['angle']['sp3']))
-                max_thickness = 2*float(sp3_diazirine)
-                thickness = sci_notation(average(min_thickness, max_thickness), sigfigs)
-
+                thickness = 0.5 * angstrom
+                
                 # calculate the proportion of well volume that is constituted by the molecular volume, in meters
-                molecular_volume = sci_notation((float(length) * angstrom)**2 * (float(thickness) * angstrom), sigfigs)
-                self.parameters['well_solution_volume'] = 0.75 * micro * liter
+                molecular_volume = sci_notation((float(length) * angstrom)**2 * thickness, sigfigs)
                 num_photosensitizers_well = (milli*N_A)*(liter*milli)/96                  # 1 millimolar, with one 1 mL, per one of 96 wells
                 self.variables['photon_collision_proportion'] = num_photosensitizers_well*float(molecular_volume) / self.parameters['well_solution_volume']
-
+                
+                # calculate the layer distribution for a slice 
+                if porphyrin_per_square_cm:
+                    self.parameters['porphyrin_per_square_cm'] = porphyrin_per_square_cm
+                    porphyrin_layer_area = porphyrin_layer_area * centi**2
+                else:
+                    solution_depth = 1*centi
+                    layers = solution_depth / thickness
+                    porphyrin_per_layer = self.variables['porphyrin_ppm'] / layers
+                    solution_incident_area = self.parameters['well_solution_volume'] / solution_depth
+                    orthogonal_area = pi*(18*angstrom)**2
+                    parallel_area = (18*angstrom) * thickness
+                    average_area = average(orthogonal_area, parallel_area)
+                    porphyrin_layer_area = porphyrin_per_layer * average_area
+                    
+                # total porphyrin area proportion
+                self.variables['area_proportion'] = porphyrin_layer_area*self.variables['porphyrin_moles']*N_A/solution_incident_area
+                
                 if self.verbose:
                     print(f'The center porphyrin object is {center_porphyrin_length} angstroms')
                     print(f'The benzyl extension is {sp2_extension} angstroms')
@@ -164,6 +181,7 @@ class PDIBacterialPkg():
                     print(f'The molecular thickness is {thickness} angstroms')
                     print(f'The molecular volume is {molecular_volume} cubic meters')
                     print('The photosensitizer volume proportion is {}'.format(self.variables['photon_collision_proportion']))
+                    print('The photosensitizer area proportion is {}'.format(self.variables['area_proportion']))
             else:
                 print('--> ERROR: The {} porphyrin selection is not defined.'.format(self.parameters['porphyrin_selection']))
                 
@@ -203,18 +221,17 @@ class PDIBacterialPkg():
             mw_molecular_oxygen = periodic_table.O.MW*2*kilo          #mg / mole
             dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted for the material surface system to only consider oxygen in the water in the vacinity of the surface material photosensitizer. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume.       
             
-            self.variables['molecules_dissolved_oxygen'] = dissolved_oxygen_concentration / mw_molecular_oxygen * self.parameters['well_solution_volume'] * N_A
+            self.variables['dissolved_mo_moles'] = dissolved_oxygen_concentration / mw_molecular_oxygen * self.parameters['well_solution_volume'] * N_A
             estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time'] * self.variables['photon_collision_proportion']
             
             if self.verbose:
-                print('molecular oxygen molecules: ', sci_notation(self.variables['molecules_dissolved_oxygen'], sigfigs))
+                print('molecular oxygen molecules: ', sci_notation(self.variables['dissolved_mo_moles'], sigfigs))
                 print('excited photosensitizer molecules: ', sci_notation(estimated_excited_photosensitizers, sigfigs))
 
             # define the kinetic parameters
             self.variables['quantum_yield'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
             self.variables['healing'] = healing_kinetics
             self.variables['k'] = kinetic_constant
-
         else:
             print('--> ERROR: The singlet oxygen generation cannot be calculated from the light source')
             
@@ -250,16 +267,15 @@ class PDIBacterialPkg():
             singlet_oxygen_interaction_radius = cell_radius + self.parameters['singlet_oxygen_diffusion_distance']
 #             membrane_solution_interface_volume = shell_volume(singlet_oxygen_interaction_radius, cell_radius)
 
-            self.variables['bcfa_conc'] = 0
-            if 'bcfa_conc' in self.membrane_chemicals:
+            if 'bcfa' in self.membrane_chemicals:
                 self.variables['bcfa_conc'] = self.membrane_chemicals['bcfa']['concentration']
             else:
                 for chemical in self.membrane_chemicals:
                     if re.search('anteiso', chemical):
                         oxidized_volume = membrane_volume * self.membrane_chemicals[chemical]['proportion']['value'] * oxidized_membrane_volume_ratio  # M^3 
-                        oxidized_ppm = oxidized_volume * self.membrane_chemicals[chemical]['density (g/L)']['value'] * milli / liter
-                        
-                        self.variables['bcfa_conc'] += oxidized_ppm  / self.membrane_chemicals[chemical]['mw']
+                        oxidized_g = oxidized_volume/liter * self.membrane_chemicals[chemical]['density (g/L)']['value'] 
+                        self.variables['bcfa_moles'] = oxidized_g / self.membrane_chemicals[chemical]['mw']
+                        self.variables['bcfa_conc'] = self.membrane_chemicals[chemical]['density (g/L)']['value'] / self.membrane_chemicals[chemical]['mw']
 
 
     def kinetic_calculation(self):
@@ -267,8 +283,8 @@ class PDIBacterialPkg():
             Used:    simulate()
         """        
         # define the first equation
-        k_so = self.variables['quantum_yield'] * self.variables['photons_per_timestep'] * self.variables['porphyrin_conc'] * self.variables['photon_collision_proportion']
-        mo = self.variables['molecules_dissolved_oxygen']
+        k_so = self.variables['quantum_yield'] * self.variables['photons_per_timestep'] * self.variables['porphyrin_moles'] * self.variables['photon_collision_proportion'] # 0.0000777859848166666
+        mo = self.variables['dissolved_mo_moles']
         
         # define the second equation
         k = self.variables['k']
@@ -282,15 +298,15 @@ class PDIBacterialPkg():
         # define the SBML model
         self.model = (f'''
           model pdi_oxidation
-            # expressions
-            o -> so;  {k_so}*o*time
-            so + bcfa -> ofa; {k}*so*bcfa*time - {healing_kinetics}*ofa*time  # time      # the aggregated photons / second must be programmatically inserted into the rate expression         
+            # expressions, chemical quantities in lieu of concentrations to accommodate different compartment volumes 
+            mo -> so;  {k_so}*mo
+            so + bcfa -> ofa; {k}*so*bcfa - {healing_kinetics}*ofa    # the aggregated photons / second must be programmatically inserted into the rate expression         
 
             # define the first expression 
-            o = {mo}
+            mo = {mo}
+            so = 0
             
             # define the second expression
-            so = 0
             ofa = 0
             bcfa = {bcfa}
             
@@ -322,10 +338,9 @@ class PDIBacterialPkg():
         if self.verbose:
             print(tellurium_model.getCurrentAntimony())
             print('\nCurrent integrator:', '\n', tellurium_model.integrator)
-            display(self.result_df)
+            print(self.result_df)
             
         return self.result_df
-
         
     def export(self, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (s)', y_label = 'oxidation proportion', biofilm_threshold = 0.05, vitality_threshold = 0.1, ):
         # parse the simulation results
@@ -353,6 +368,7 @@ class PDIBacterialPkg():
         inline_omex = '\n'.join([self.model, self.phrasedml_str])  
         omex_file_name = 'input.omex'
         tellurium.exportInlineOmex(inline_omex, os.path.join(self.simulation_path, omex_file_name))
+        self.result_df.to_csv(os.path.join(self.simulation_path, 'raw_data.csv'))
         
         # export the figure
         figure_path = os.path.join(self.simulation_path, 'output.svg')
@@ -378,7 +394,7 @@ class PDIBacterialPkg():
             parameters['value'].append(self.parameters[parameter])
         parameters_table = pandas.DataFrame(parameters)
         if self.verbose:
-            display(parameters_table)
+            print(parameters_table)
         
         parameters_path = os.path.join(self.simulation_path, 'parameters.csv')
         parameters_table.to_csv(parameters_path)
@@ -392,7 +408,7 @@ class PDIBacterialPkg():
             variables['value'].append(self.variables[variable])
         variables_table = pandas.DataFrame(variables)
         if self.verbose:
-            display(variables_table)
+            print(variables_table)
         
         variables_path = os.path.join(self.simulation_path, 'variables.csv')
         variables_table.to_csv(variables_path)
