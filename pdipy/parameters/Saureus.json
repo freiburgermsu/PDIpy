@@ -1,31 +1,33 @@
 {
   "Saureus": {
     "membrane_chemicals": {
-      "anteiso_C17": {
+      "BCFA": {
         "density (g/L)": {
-          "value": 1,
-          "reference": null
+          "value": 0.9,
+          "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density", "https://pubchem.ncbi.nlm.nih.gov/compound/445639"],
+	  "notes": "The density is estimated to be between stearic acid and oleic acid"
         },
-        "proportion": {
-          "value": 0.3,
-          "reference": null,
-          "notes": "Fatty acids constitute approximately 60% of membrane volume"
-        },
-        "formula": "C18_H35_O2",
-        "mw": 283.476
+        "formula": ["C18_H34_O2","C16_H30_O2"],
+        "mw": [283.476,255.422],
+	"proportion": {
+	  "value": 0.662,
+	  "reference": "A. G . O’DONNELL, M. R . NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V . HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+	  "notes": "All BCFAs were summed from Table 2 for all S. aureus entries."
+	}
       },
-      "anteiso_C15": {
+      "SCFA": {
         "density (g/L)": {
-          "value": 1,
-          "reference": null
+          "value": 0.94,
+          "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density"],
+	  "notes": "The density for all saturated fatty acids is estimated as stearic acid."
         },
-        "proportion": {
-          "value": 0.3,
-          "reference": null,
-          "notes": "Fatty acids constitute approximately 60% of membrane volume"
-        },
-        "formula": "C16_H31_O2",
-        "mw": 255.422
+        "formula": ["C20_H38_O2","C18_H34_O2","C16_H30_O2"],
+        "mw": [283.476,255.422],
+	"proportion": {
+	  "value": 0.268,
+	  "reference": "A. G. O’DONNELL, M. R. NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V. HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+	  "notes": "All saturated SCFAs were summed from Table 2 for all S. aureus entries."
+	}
       }
     },
     "shape": {
@@ -33,16 +35,16 @@
       "reference": null
     },
     "membrane_thickness (nm)": {
-      "value": 50,
-      "reference": null
+      "value": 4,
+      "reference": "W.Rawicz, K.C.Olbrich, T.McIntosh, D.Needham, E.Evans (2000). Effect of Chain Length and Unsaturation on Elasticity of Lipid Bilayers. Biophysical Journal, 79(1), 328–339. https://doi.org/10.1016/S0006-3495(00)76295-3"
     },
     "cell_mass (pg)": {
       "value": 1,
-      "reference": null
+      "reference": "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
     },
-    "cell_volume (fL)": {
+    "cell_volume (pL)": {
       "value": 1,
-      "reference":  null
+      "reference":  "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
     },
     "stop_biomass_threshold (%)": {
       "value": 0.05,
