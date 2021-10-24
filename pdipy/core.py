@@ -14,6 +14,10 @@ import os
 
 pandas.set_option('max_colwidth', None)
 
+# define useful functions
+def sigfigs_conversion(num, sigfigs = 2):
+    return float(sci_notation(num, sigfigs))
+
 def average(num_1, num_2 = None):
     if type(num_1) is list:
         return sum(num_1) / len(num_1)
@@ -38,13 +42,9 @@ chemical_dimensions = {
     }
 }
 
-def sigfigs_conversion(num, sigfigs = 2):
-    return float(sci_notation(num, sigfigs))
-
-
 
 class PDIBacterialPkg():
-    def __init__(self, photosensitizer_surface_area = None, surface_area = None, solution_volume = 0.75, solution_depth = 1, verbose = False, jupyter = False):
+    def __init__(self, verbose = False, jupyter = False):
         """ Define the initial PDI and biological parameters
         """        
         # define base organizations
@@ -55,19 +55,31 @@ class PDIBacterialPkg():
         self.jupyter = jupyter
         
         # initial parameters
-        self.parameters['singlet_oxygen_diffusion_distance'] = 80 * nano       # Moan1990 
+        self.parameters['singlet_oxygen_diffusion_distance (nm)'] = 80 * nano       # Moan1990 
         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = os.path.dirname(__file__)
         
+    def define_system(self, surface_area = None, solution_volume = None, solution_depth = None, photosensitizer_surface_area = None,):
         # parameterize the photosensitizer system
-        if photosensitizer_surface_area is None:
-            self.parameters['well_solution_volume'] = solution_volume * micro * liter
-            self.parameters['solution_depth'] = solution_depth*centi
-            self.parameters['surface_area'] = self.parameters['well_solution_volume'] / (solution_depth*centi)
-        elif photosensitizer_surface_area:
+        if photosensitizer_surface_area:
             self.parameters['photosensitizer_surface_area'] = photosensitizer_surface_area
-            self.parameters['surface_area'] = surface_area
-
+            self.parameters['surface_area (m^2)'] = surface_area
+        
+        elif surface_area is None:
+            self.parameters['well_solution_volume (m^3)'] = solution_volume*micro*liter
+            self.parameters['solution_depth (m)'] = solution_depth*centi
+            self.parameters['surface_area (m^2)'] = self.parameters['well_solution_volume (m^3)'] / (solution_depth*centi)
+            
+        elif solution_volume is None:
+            self.parameters['solution_depth (m)'] = solution_depth*centi
+            self.parameters['surface_area (m^2)'] = surface_area*centi**2
+            self.parameters['well_solution_volume (m^3)'] = self.parameters['solution_depth (m)'] * self.parameters['surface_area (m^2)']
+            
+        elif solution_depth is None:
+            self.parameters['well_solution_volume (m^3)'] = solution_volume*micro*liter
+            self.parameters['surface_area (m^2)'] = surface_area*centi**2
+            self.parameters['solution_depth (m)'] = self.parameters['well_solution_volume (m^3)'] / self.parameters['surface_area (m^2)']
+            
     def define_bacterium(self, bacterial_specie):    
         self.results['cellular_vitality'] = True
         self.results['biofilm_growth'] = True
@@ -85,27 +97,27 @@ class PDIBacterialPkg():
         self.parameters['photosensitizer_selection'] = photosensitizer
         self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['root_path'])))[photosensitizer]
         
-        self.parameters['soret'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
-        self.parameters['q'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
+        self.parameters['soret (m)'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
+        self.parameters['q (m)'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
 
         self.parameters['photosensitizer_molar'] = photosensitizer_molar
-        self.variables['photosensitizers'] = (self.parameters['photosensitizer_molar']*N_A) * (self.parameters['well_solution_volume']/liter)
+        self.variables['photosensitizers'] = (self.parameters['photosensitizer_molar']*N_A) * (self.parameters['well_solution_volume (m^3)']/liter)
 
     def define_light(self, light_source, irradiance = None, exposure = None, simulation_time = None, lux = None, lumens = None, wattage = None, distance = None, reflection = False):
-        self.parameters['visible'] = {'upper': 780 * nano, 'lower': 390 * nano}
+        self.parameters['visible (nm)'] = {'upper': 780 * nano, 'lower': 390 * nano}
 
         light_parameters = json.load(open('{}/parameters/light_source.json'.format(self.parameters['root_path'])))
         self.parameters['visible_proportion'] = light_parameters[light_source]['visible_proportion']['value']
         
         # define the available light
         if irradiance is not None: # mW / cm^2
-            self.parameters['watts'] = irradiance * milli * self.parameters['surface_area']
+            self.parameters['watts'] = (irradiance*milli/centi**2) * self.parameters['surface_area (m^2)']
         elif exposure is not None:  # J / cm^2
             simulation_time = simulation_time * minute
-            self.parameters['watts'] = exposure / simulation_time * self.parameters['surface_area']
-        elif lux is not None: # lumen / m^2
-            irradiance =  lux / light_parameters[light_source]['lumens_per_watt']['value']
-            self.parameters['watts'] = irradiance * milli * self.parameters['surface_area']
+            self.parameters['watts'] = (exposure/centi**2) / simulation_time * self.parameters['surface_area (m^2)']
+        elif lux is not None: # lumen / cm^2
+            irradiance =  (lux/centi**2) / light_parameters[light_source]['lumens_per_watt']['value']
+            self.parameters['watts'] = irradiance * self.parameters['surface_area (m^2)']
         elif lumens is not None: # lumen
             self.parameters['watts'] = lumens / light_parameters[light_source]['lumens_per_watt']['value']
         else:
@@ -124,8 +136,8 @@ class PDIBacterialPkg():
             atomic_thickness = 1.5 * angstrom   # https://www.nature.com/articles/ncomms1291
 
         # calculate the proportion of well volume that is constituted by the molecular volume, in meters
-        self.variables['molecular_volume'] = length**2 * atomic_thickness
-        self.variables['volume_proportion'] = (self.variables['photosensitizers'] * self.variables['molecular_volume']) / self.parameters['well_solution_volume']
+        self.variables['molecular_volume (m^3)'] = length**2 * atomic_thickness
+        self.variables['volume_proportion'] = (self.variables['photosensitizers'] * self.variables['molecular_volume (m^3)']) / self.parameters['well_solution_volume (m^3)']
 
         # calculate the layer distribution for a slice 
         if photosensitizer_moles_per_square_cm:
@@ -133,23 +145,23 @@ class PDIBacterialPkg():
             porphyrin_layer_area = self.parameters['photosensitizers_per_square_cm'] * centi**2
         else:
             tilted_height = length*float(sin(radians(45)))
-            layers = self.parameters['solution_depth'] / tilted_height
+            layers = self.parameters['solution_depth (m)'] / tilted_height
             photosensitizers_per_layer = self.variables['photosensitizers'] / layers
             orthogonal_area = pi*(length)**2
             parallel_area = (length)*atomic_thickness
             photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
 
         # total porphyrin area proportion
-        self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area']                
+        self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)']               
         self.defined_model = True
         if self.verbose:
-            print('The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth'], ceil(layers)))
+            print('The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers)))
             print(f'The center porphyrin object is {sigfigs_conversion(center_porphyrin_length)} meters')
             print(f'The benzyl extension is {sigfigs_conversion(sp2_extension)} meters')
             print(f'The diazirine is {sigfigs_conversion(sp3_diazirine)} meters')
             print(f'The molecular length is {sigfigs_conversion(length)} meters')
             print(f'The atomic_thickness is {sigfigs_conversion(atomic_thickness)} meters')
-            print('The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume'])))
+            print('The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)'])))
             print('The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion'])))
             print('The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion'])))
 
@@ -159,22 +171,21 @@ class PDIBacterialPkg():
             sys.exit('ERROR: The model must first be defined.')
             
         self.parameters['initial_time'] = initial_time
-        self.parameters['total_time'] = total_time * minute
-        self.parameters['timestep'] = timestep
-        seconds_per_timestep = self.parameters['timestep'] * minute            
+        self.parameters['total_time (s)'] = total_time * minute
+        self.parameters['timestep (s)'] = timestep * minute       
             
         if 'watts' in self.parameters:                   
             # define the light watts
             effective_visible_light_watts = self.parameters['watts'] * self.parameters['visible_proportion']
-            visible_region = self.parameters['visible']['upper'] - self.parameters['visible']['lower']
-            excitation_visible_proportion = ((self.parameters['soret']['upper'] - self.parameters['soret']['lower'])) / visible_region
+            visible_region = self.parameters['visible (nm)']['upper'] - self.parameters['visible (nm)']['lower']
+            excitation_visible_proportion = ((self.parameters['soret (m)']['upper'] - self.parameters['soret (m)']['lower'])) / visible_region
             effective_excitation_watts = excitation_visible_proportion * effective_visible_light_watts  # homogeneous light intesity throughout the visible spectrum is assumed
             
             # photonic calculations
-            average_excitation_wavelength = (self.parameters['q']['upper'] + self.parameters['soret']['lower']) / 2
+            average_excitation_wavelength = (self.parameters['q (m)']['upper'] + self.parameters['soret (m)']['lower']) / 2
             joules_per_photon = (h * c) / average_excitation_wavelength
             photons_per_second = effective_excitation_watts / joules_per_photon
-            self.variables['photon_moles_per_timestep'] = photons_per_second * seconds_per_timestep / N_A
+            self.variables['photon_moles_per_timestep'] = photons_per_second * self.parameters['timestep (s)'] / N_A
             
             # singlet oxygen calculations
             '''so_from_light = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
@@ -200,48 +211,47 @@ class PDIBacterialPkg():
             # define calculation functions
             def shell_volume(radi_1, radi_2, coeff = 1):
                 volume = (4*pi/3) * coeff * (radi_1**3 - radi_2**3)
-                return volume
-            def cap_volume(r, h):
-                volume = (pi/3) * h**2 * (3*r - h)
-                return volume
+                return volume        
+            def sector_volume(r, h):
+                volume = (2*pi/3)*r**2*h
+                return volume       
             
             # calculate the cellular dimensions
-            self.variables['cell_radius'] = pow((self.bacterium['cell_volume (pL)']['value'] * pico  / liter * 3) / (4 * pi), 1/3)
-            membrane_inner_radius = self.variables['cell_radius'] - self.bacterium['membrane_thickness (nm)']['value'] * nano
+            self.variables['cell_radius (m)'] = pow((self.bacterium['cell_volume (pL)']['value'] * pico  / liter * 3) / (4 * pi), 1/3)
+            membrane_inner_radius = self.variables['cell_radius (m)'] - self.bacterium['membrane_thickness (nm)']['value'] * nano
 
             # calculate the cellular and oxidation volumes
-            membrane_volume = shell_volume(self.variables['cell_radius'], membrane_inner_radius) # M^3
-            outer_h = self.variables['cell_radius'] * (1 - cos(radians(self.parameters['oxidation_angle'])))
-            cap_volume = cap_volume(self.variables['cell_radius'], outer_h)
-            self.variables['oxidized_membrane_volume_ratio'] = cap_volume / membrane_volume
+            membrane_volume = shell_volume(self.variables['cell_radius (m)'], membrane_inner_radius) # M^3
+            outer_h = self.variables['cell_radius (m)'] * (1 - cos(radians(self.parameters['oxidation_angle'])))
+            inner_h = membrane_inner_radius * (1 - cos(radians(self.parameters['oxidation_angle'])))
+            shell_sector_volume = sector_volume(self.variables['cell_radius (m)'], outer_h) - sector_volume(membrane_inner_radius, inner_h)
+            self.variables['oxidized_membrane_volume_ratio'] = shell_sector_volume / membrane_volume
 
             #calculate the cellular and oxidation areas
-            oxidized_cap_area = 2 * pi * self.variables['cell_radius'] * outer_h
-            cell_area = 4 * pi * self.variables['cell_radius'] ** 2
+            oxidized_cap_area = 2 * pi * self.variables['cell_radius (m)'] * outer_h
+            cell_area = 4 * pi * self.variables['cell_radius (m)'] ** 2
             self.variables['oxidized_area_ratio'] = oxidized_cap_area / cell_area
 
             # fatty acid concentrations in the phospholipid membrane
-#             if 'BCFA' in self.membrane_chemicals:
-#                 self.variables['fa_g/L_conc'] = self.membrane_chemicals['BCFA']['concentration']['value'] 
-#                 if 'SCFA' in self.membrane_chemicals:
-#                     self.variables['fa_g/L_conc'] += self.membrane_chemicals['SCFA']['concentration']['value']
-#             else:
-            fa_g = self.variables['fa_moles'] = self.variables['fa_g/L_conc'] = self.variables['fa_conc'] = 0
+            self.variables['fa_g/L_conc'] = total_proportion = 0
             oxidized_volume = membrane_volume * self.variables['oxidized_membrane_volume_ratio']
             for chemical in self.membrane_chemicals:
                 if re.search('FA', chemical):
                     self.variables['fa_molar'] = self.membrane_chemicals[chemical]['density (g/L)']['value'] / average(self.membrane_chemicals[chemical]['mw']) * self.membrane_chemicals[chemical]['proportion']['value'] # * oxidized_volume/liter 
                     self.variables['fa_g/L_conc'] += self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value']
+                    total_proportion += self.membrane_chemicals[chemical]['proportion']['value']
                         
+            self.variables['fa_g/L_conc'] /= total_proportion
+            self.variables['fa_molar'] /= total_proportion
             self.variables['k'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
-                        
+            self.variables['k_so'] = self.variables['quantum_yield'] * self.variables['photon_moles_per_timestep'] * self.parameters['photosensitizer_molar'] #  * self.variables['volume_proportion'] * micro**2*milli/10 # 0.0000777859848166666
             if self.verbose:
                 print('oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio'])
-                print('oxidized area proportion: ',self.variables['oxidized_area_ratio'], '\n\n')
+                print('volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7))
 
     def kinetic_calculation(self): 
         # define the first equation
-        k_so = self.variables['quantum_yield'] * (self.variables['photon_moles_per_timestep'] * self.variables['volume_proportion']) * self.parameters['photosensitizer_molar'] # * micro**2*milli/10 # 0.0000777859848166666
+        k_so = self.variables['k_so']
         mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
         
         # define the second equation
@@ -276,17 +286,17 @@ class PDIBacterialPkg():
           end
         ''')       
         # define the SEDML plot
-        total_points = self.parameters['total_time'] / self.parameters['timestep'] 
+        total_points = self.parameters['total_time (s)'] / self.parameters['timestep (s)'] 
         self.phrasedml_str = '''
           model1 = model "pdi_oxidation"
           sim1 = simulate uniform({}, {}, {})
           task1 = run sim1 on model1
           plot "Oxidation proportion of prokaryotic membrane fatty acids" time vs biofilm, vitality, oxidation
-        '''.format(self.parameters['initial_time'], self.parameters['total_time'], total_points)
+        '''.format(self.parameters['initial_time'], self.parameters['total_time (s)'], total_points)
         
         # execute the model
         tellurium_model = tellurium.loada(self.model)            
-        result = tellurium_model.simulate(self.parameters['initial_time'], int(self.parameters['total_time']), int(total_points))
+        result = tellurium_model.simulate(self.parameters['initial_time'], int(self.parameters['total_time (s)']), int(total_points))
         
         # process the data
         self.result_df = pandas.DataFrame(result)
@@ -296,6 +306,7 @@ class PDIBacterialPkg():
         self.result_df.columns = ['[o]', '[so]', '[bcfa]', '[ofa]']
         
         if self.verbose:
+            print('\n\n')
             print(tellurium_model.getCurrentAntimony())
             print('\nCurrent integrator:', '\n', tellurium_model.integrator)
             if self.jupyter:
