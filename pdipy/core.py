@@ -192,7 +192,7 @@ class PDIBacterialPkg():
             mw_molecular_oxygen = periodic_table.O.MW*2*kilo          #mg / mole
             dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted for the material surface system to only consider oxygen in the water in the vacinity of the surface material photosensitizer. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume.       
             self.variables['dissolved_mo_molar'] = dissolved_oxygen_concentration*milli / mw_molecular_oxygen # * self.parameters['well_solution_volume'] * N_A
-            estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time'] * self.variables['volume_proportion']
+            estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time (s)'] * self.variables['volume_proportion']
 
             # define the kinetic parameters
             self.variables['quantum_yield'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
@@ -238,7 +238,7 @@ class PDIBacterialPkg():
             for chemical in self.membrane_chemicals:
                 if re.search('FA', chemical):
                     self.variables['fa_molar'] = self.membrane_chemicals[chemical]['density (g/L)']['value'] / average(self.membrane_chemicals[chemical]['mw']) * self.membrane_chemicals[chemical]['proportion']['value'] # * oxidized_volume/liter 
-                    self.variables['fa_g/L_conc'] += self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value']
+                    self.variables['fa_g/L_conc'] += self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value'] / milli
                     total_proportion += self.membrane_chemicals[chemical]['proportion']['value']
                         
             self.variables['fa_g/L_conc'] /= total_proportion
@@ -251,7 +251,7 @@ class PDIBacterialPkg():
 
     def kinetic_calculation(self): 
         # define the first equation
-        k_so = self.variables['k_so']
+        k_so = self.variables['k_so'] #* 1e10
         mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
         
         # define the second equation
