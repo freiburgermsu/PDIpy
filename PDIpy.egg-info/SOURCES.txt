@@ -5,6 +5,7 @@ setup.py
 PDIpy.egg-info/PKG-INFO
 PDIpy.egg-info/SOURCES.txt
 PDIpy.egg-info/dependency_links.txt
+PDIpy.egg-info/requires.txt
 PDIpy.egg-info/top_level.txt
 pdipy/__init__.py
 pdipy/core.py

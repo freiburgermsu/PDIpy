@@ -1,0 +1,19 @@
+,variable,value
+0,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\2021-10-30-PDIpy-A3B_4Zn-Saureus-6
+1,center_porphyrin_length,6.115819212738726e-10
+2,sp2_extension,6.102500000000001e-10
+3,sp3_diazirine,7.198734239946551e-10
+4,photosensitizers,1.728475459234462e+20
+5,molecular_volume (m^3),5.034786249387848e-28
+6,volume_proportion,71958.74605462559
+7,area_proportion,1322859.7443850269
+8,photon_moles_per_timestep,2.6499937939966375e-05
+9,dissolved_mo_molar,2.812605472705227e-07
+10,quantum_yield,0.48
+11,healing,5
+12,cell_radius (m),0.0006203504908994003
+13,oxidized_membrane_volume_ratio,0.001902650954146388
+14,oxidized_area_ratio,0.001902650954127227
+15,fa_g/L_conc,911.52688172043
+16,fa_molar,0.0010053172230370404
+17,k,246112.2580645161
