@@ -55,6 +55,7 @@ class PDIBacterialPkg():
         self.results = {}
         self.verbose = verbose
         self.jupyter = jupyter
+        self.messages = []
         
         # initial parameters
         self.parameters['singlet_oxygen_diffusion_distance (nm)'] = 80 * nano       # Moan1990 
@@ -85,7 +86,7 @@ class PDIBacterialPkg():
             self.parameters['solution_volume (m^3)'] = self.parameters['solution_depth (m)'] * self.parameters['surface_area (m^2)']
             
         elif solution_depth is None:
-            self.parameters['solution_volume (m^3)'] = solution_volume*micro*liter
+            self.parameters['solution_volume (m^3)'] = solution_volume*centi**3
             self.parameters['surface_area (m^2)'] = surface_area*centi**2
             self.parameters['solution_depth (m)'] = self.parameters['solution_volume (m^3)'] / self.parameters['surface_area (m^2)']
             
@@ -122,9 +123,14 @@ class PDIBacterialPkg():
             self.parameters['photosensitizer_molar'] = self.variables['photosensitizers']/N_A / (self.parameters['solution_volume (m^3)']/liter)
             
         if self.verbose:
-            print('The center porphyrin object is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length'])))
-            print('The benzyl extension is {} meters'.format(sigfigs_conversion(self.variables['sp2_extension'])))
-            print('The diazirine is {} meters'.format(sigfigs_conversion(self.variables['sp3_diazirine'])))
+            message1 = 'The center porphyrin object is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length']))
+            message2 = 'The benzyl extension is {} meters'.format(sigfigs_conversion(self.variables['sp2_extension']))
+            message3 = 'The diazirine is {} meters'.format(sigfigs_conversion(self.variables['sp3_diazirine']))
+            self.messages.extend([message1, message2, message3])
+            
+            print(message1)
+            print(message2)
+            print(message3)
 
     def define_light(self, light_source, irradiance = None, exposure = None, simulation_time = None, lux = None, lumens = None, wattage = None, distance = None, reflection = False):
         self.parameters['visible (nm)'] = {'upper': 780 * nano, 'lower': 390 * nano}
@@ -144,7 +150,9 @@ class PDIBacterialPkg():
         elif lumens is not None: # lumen
             self.parameters['watts'] = lumens / light_parameters[light_source]['lumens_per_watt']['value']
         else:
-            print('--> ERROR: The light source has an unrecognized dimension.')
+            error = '--> ERROR: The light source has an unrecognized dimension.'
+            self.messages.append(error)
+            print(error)
 
     def define_photosensitizer_volume(self, molecular_proportion = None, photosensitizer_moles_per_square_cm = None):
         # determine the individual molecular components
@@ -174,16 +182,25 @@ class PDIBacterialPkg():
         self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)']               
         self.defined_model = True
         if self.verbose:
-            print('The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers)))
-            print(f'The molecular length is {sigfigs_conversion(conjugated_length)} meters')
-            print('The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)'])))
-            print('The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion'])))
-            print('The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion'])))
+            message1 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
+            message2 = f'The molecular length is {sigfigs_conversion(conjugated_length)} meters'
+            message3 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
+            message4 = 'The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion']))
+            message5 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
+            self.messages.extend([message1, message2, message3, messasge4, message5])
+            
+            print(message1)
+            print(message2)
+            print(message3)
+            print(message4)
+            print(message5)
 
     def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5):
         if not self.defined_model:
             import sys
-            sys.exit('ERROR: The model must first be defined.')
+            error = 'ERROR: The model must first be defined.'
+            self.messages.append(error)
+            sys.exit(error)
             
         self.parameters['initial_time'] = initial_time
         self.parameters['total_time (s)'] = total_time * minute
@@ -219,12 +236,20 @@ class PDIBacterialPkg():
             self.variables['healing'] = healing_kinetics
             
             if self.verbose:
-                print('photons per timestep: ', self.variables['photon_moles_per_timestep'])
-                print('molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar']))
-                print('excited photosensitizer molecules: ', sigfigs_conversion(estimated_excited_photosensitizers))
-                print('effective excitation watts: ', sigfigs_conversion(effective_excitation_watts))
+                message1 = 'photons per timestep: ', self.variables['photon_moles_per_timestep']
+                message2 = 'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar'])
+                message3 = 'excited photosensitizer molecules: ', sigfigs_conversion(estimated_excited_photosensitizers)
+                message4 = 'effective excitation watts: ', sigfigs_conversion(effective_excitation_watts)
+                self.messages.extend([message1, message2, message3, message4])
+
+                print(message1)
+                print(message2)
+                print(message3)
+                print(message4)
         else:
-            print('--> ERROR: The singlet oxygen generation cannot be calculated from the light source')
+            error = '--> ERROR: The singlet oxygen generation cannot be calculated from the light source'
+            self.messages.append(error)
+            print(error)
             
     def geometric_oxidation(self):
         if self.bacterium['shape']['value'] == "sphere":
@@ -265,8 +290,12 @@ class PDIBacterialPkg():
             self.variables['fa_molar'] /= total_proportion
             self.variables['k'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
             if self.verbose:
-                print('oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio'])
-                print('volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7))
+                message1 = 'oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio']
+                message2 = 'volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7)
+                self.messages.extend([message1, message2])
+
+                print(message1)
+                print(message2)
 
     def kinetic_calculation(self): 
         # define the first equation
@@ -332,9 +361,13 @@ class PDIBacterialPkg():
         self.result_df.columns = ['[ps]', '[e_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
         
         if self.verbose:
-            print('\n\n')
-            print(tellurium_model.getCurrentAntimony())
-            print('\nCurrent integrator:', '\n', tellurium_model.integrator)
+            message1 = tellurium_model.getCurrentAntimony()
+            message2 = '\nCurrent integrator:', '\n', tellurium_model.integrator
+            message3 = self.result_df
+            self.messages.extend([message1, message2, message3])
+
+            print(message1)
+            print(message2)
             if self.jupyter:
                 display(self.result_df)
             else:
