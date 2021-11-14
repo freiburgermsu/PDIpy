@@ -1,0 +1,33 @@
+{
+  "incandescent": {
+    "visible_proportion": {
+      "value": 0.1,
+      "reference": "Macisaac et al., 1999"
+    },
+    "lumens_per_watt": {
+      "value": 3,
+      "reference": "Michael F. Hordeski. Dictionary Of Energy Efficiency Technologies. Fairmont Press. ISBN: 9780824748104"
+    }
+  },
+  "LED": {
+    "visible_proportion": {
+      "value": 0.5,
+      "reference": null,
+      "notes": "~80% more energy efficient and thus 5x more visible light per energy relative to incandescent bulbs"
+    },
+    "lumens_per_watt": {
+      "value": 17,
+      "reference": "Michael F. Hordeski. Dictionary Of Energy Efficiency Technologies. Fairmont Press. ISBN: 9780824748104"
+    }
+  },
+  "fluorescent": {
+    "visible_proportion": {
+      "value": 0.4,
+      "reference": null
+    },
+    "lumens_per_watt": {
+      "value": 70,
+      "reference": "Michael F. Hordeski. Dictionary Of Energy Efficiency Technologies. Fairmont Press. ISBN: 9780824748104"
+    }
+  }
+}

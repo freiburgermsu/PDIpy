@@ -1,0 +1,50 @@
+{
+  "Saureus": {
+    "membrane_chemicals": {
+      "BCFA": {
+        "density (g/L)": {
+          "value": 0.9,
+          "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density", "https://pubchem.ncbi.nlm.nih.gov/compound/445639"],
+	  "notes": "The density is estimated to be between stearic acid and oleic acid"
+        },
+        "formula": ["C18_H34_O2","C16_H30_O2"],
+        "mw": [283.476,255.422],
+	"proportion": {
+	  "value": 0.662,
+	  "reference": "A. G . O’DONNELL, M. R . NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V . HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+	  "notes": "All BCFAs were summed from Table 2 for all S. aureus entries."
+	}
+      },
+      "SCFA": {
+        "density (g/L)": {
+          "value": 0.94,
+          "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density"],
+	  "notes": "The density for all saturated fatty acids is estimated as stearic acid."
+        },
+        "formula": ["C20_H38_O2","C18_H34_O2","C16_H30_O2"],
+        "mw": [283.476,255.422],
+	"proportion": {
+	  "value": 0.268,
+	  "reference": "A. G. O’DONNELL, M. R. NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V. HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+	  "notes": "All saturated SCFAs were summed from Table 2 for all S. aureus entries."
+	}
+      }
+    },
+    "shape": {
+      "value": "sphere",
+      "reference": null
+    },
+    "membrane_thickness (nm)": {
+      "value": 4,
+      "reference": "W.Rawicz, K.C.Olbrich, T.McIntosh, D.Needham, E.Evans (2000). Effect of Chain Length and Unsaturation on Elasticity of Lipid Bilayers. Biophysical Journal, 79(1), 328–339. https://doi.org/10.1016/S0006-3495(00)76295-3"
+    },
+    "cell_mass (pg)": {
+      "value": 1,
+      "reference": "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
+    },
+    "cell_volume (pL)": {
+      "value": 1,
+      "reference":  "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
+    }
+  }
+}
