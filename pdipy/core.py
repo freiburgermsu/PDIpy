@@ -6,6 +6,7 @@ from matplotlib import pyplot
 from datetime import date
 from sigfig import round
 import tellurium
+import graphviz
 import pandas
 import json
 import sys
@@ -88,7 +89,7 @@ class PDIBacterialPkg():
             self.parameters['solution_volume (m^3)'] = solution_volume*centi**3
             self.parameters['surface_area (m^2)'] = surface_area*centi**2
             self.parameters['solution_depth (m)'] = self.parameters['solution_volume (m^3)'] / self.parameters['surface_area (m^2)']
-            
+                                        
     def define_bacterium(self, bacterial_specie):    
         self.results['cellular_vitality'] = True
         self.results['biofilm_growth'] = True
@@ -121,7 +122,7 @@ class PDIBacterialPkg():
             self.variables['photosensitizers'] = (self.parameters['photosensitizer_molar']*N_A) * (self.parameters['solution_volume (m^3)']/liter)
         else:
             self.variables['photosensitizers'] = self.parameters['photosensitizer_mg_per_sqr_cm']*milli/centi**2 / self.photosensitizer['mw']['value']*N_A * self.parameters['surface_area (m^2)']
-            self.parameters['solution_volume (m^3)'] = self.parameters['surface_area (m^2)']*linked_total_length)
+            self.parameters['solution_volume (m^3)'] = self.parameters['surface_area (m^2)']*linked_total_length
             self.parameters['photosensitizer_molar'] = self.variables['photosensitizers']/N_A / (self.parameters['solution_volume (m^3)']/liter)
             
         # determine the individual molecular components
@@ -140,7 +141,6 @@ class PDIBacterialPkg():
         else:
             tilted_height = conjugated_length*float(sin(radians(45)))
             layers = 1
-            self.parameters['solution_depth (m)'] = None
             if not self.surface_system:
                 layers = self.parameters['solution_depth (m)'] / tilted_height
             photosensitizers_per_layer = self.variables['photosensitizers'] / layers
@@ -149,7 +149,7 @@ class PDIBacterialPkg():
             photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
             
         # calculate the volume proportion in the cross-linked layer
-        self.parameters['layer_volume (m^3)'] = 
+        self.parameters['layer_volume (m^3)'] = self.parameters['solution_volume (m^3)'] / layers
         self.variables['volume_proportion'] = molecules_volume / self.parameters['layer_volume (m^3)']
 
         # total porphyrin area proportion
@@ -159,12 +159,14 @@ class PDIBacterialPkg():
             message1 = 'The center porphyrin object is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length']))
             message2 = 'The benzyl extension is {} meters'.format(sigfigs_conversion(self.variables['sp2_extension']))
             message3 = 'The diazirine is {} meters'.format(sigfigs_conversion(self.variables['sp3_diazirine']))
-            message4 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
+            message4 = 'Solution depth is not calculated for surface systems'
+            if not self.surface_system:
+                message4 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
             message5 = f'The molecular length is {sigfigs_conversion(conjugated_length)} meters'
             message6 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
             message7 = 'The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion']))
             message8 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
-            self.messages.extend([message1, message2, message3, messasge4, message5, message6, messasge7, message8])
+            self.messages.extend([message1, message2, message3, message4, message5, message6, message7, message8])
             
             print(message1)
             print(message2)
@@ -197,16 +199,29 @@ class PDIBacterialPkg():
             self.messages.append(error)
             print(error)
 
-    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5):
+    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E8):
         if not self.defined_model:
             import sys
             error = 'ERROR: The model must first be defined.'
             self.messages.append(error)
             sys.exit(error)
             
+        # timestep conditions
         self.parameters['initial_time'] = initial_time
         self.parameters['total_time (s)'] = total_time * minute
-        self.parameters['timestep (s)'] = timestep * minute       
+        self.parameters['timestep (s)'] = timestep * minute
+        
+        # SO lifetime determination
+        cfu_lifetime_slope = (40-10) / (1E8-1E4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
+        initial_lifetime = 10
+        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*bacterial_cfu_ml+initial_lifetime) * micro 
+        self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
+        
+        # excited photosensitizer lifetime
+        self.variables['e_ps_charge_transfer'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007     
+        
+        # photobleaching
+        self.variables['hv_photobleaching'] = 0.015 * (self.parameters['watts']/self.parameters['surface_area (m^2)'])  # “Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005
             
         if 'watts' in self.parameters:                   
             # define the light watts
@@ -225,11 +240,11 @@ class PDIBacterialPkg():
             '''so_from_light = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
             mw_molecular_oxygen = periodic_table.O.MW*2*kilo          #mg / mole
             dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted for the material surface system to only consider oxygen in the water in the vacinity of the surface material photosensitizer. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume.    
-            if self.parameters['medium'] == 'air':
-                self.variables['so_relaxation'] = 1e4
-            if self.parameters['medium'] == 'water':
-                self.variables['so_relaxation'] = 1e10
-            self.variables['ps_relaxation'] = 1e4
+#             if self.parameters['medium'] == 'air':
+#                 self.variables['so_relaxation'] = 1e4
+#             if self.parameters['medium'] == 'water':
+#                 self.variables['so_relaxation'] = 1e10
+#             self.variables['ps_relaxation'] = 1e4
             self.variables['dissolved_mo_molar'] = dissolved_oxygen_concentration*milli / mw_molecular_oxygen # * self.parameters['well_solution_volume'] * N_A
             estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time (s)'] * self.variables['volume_proportion']
 
@@ -264,7 +279,7 @@ class PDIBacterialPkg():
                 return volume       
             
             # calculate the cellular dimensions
-            self.variables['cell_radius (m)'] = pow((self.bacterium['cell_volume (pL)']['value'] * pico  / liter * 3) / (4 * pi), 1/3)
+            self.variables['cell_radius (m)'] = pow((self.bacterium['cell_volume (pL)']['value']*pico/liter*3) / (4*pi), 1/3)
             membrane_inner_radius = self.variables['cell_radius (m)'] - self.bacterium['membrane_thickness (nm)']['value'] * nano
 
             # calculate the cellular and oxidation volumes
@@ -301,45 +316,49 @@ class PDIBacterialPkg():
             print(message2)
 
     def kinetic_calculation(self): 
-        # define the first equation
+        # define photosensitizer excitation
         ps = self.parameters['photosensitizer_molar']
         hv = self.variables['photon_moles_per_timestep']
         qy = self.variables['quantum_yield']
         k_ps = self.variables['k_ps'] = 1e10
         
-        # define the second equation
+        # define photosensitizer photobleaching
+        k_hv_ps = self.variables['hv_photobleaching']
+        
+#         self.parameters['so_rise_time (s)']
+        
+        # define singlet oxygen generation
         mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
-        k_so = self.variables['k_so'] = 1e10
+        k_so = 1/self.variables['e_ps_charge_transfer']
+        k_rlx_so = 1/self.variables['so_decay_time (s)']
         
         # define the third equation
         k_fa = self.variables['k_fa'] # 1/sec
         fa = self.variables['fa_molar']
         
         # define constants
-        so_relaxation = self.variables['so_relaxation']
-        ps_relaxation = self.variables['ps_relaxation']
+#         so_relaxation = self.variables['so_relaxation']
+#         ps_relaxation = self.variables['ps_relaxation'] # - ({ps_relaxation}*e_ps)
 
         # define the SBML model
         self.model = (f'''
-          model pdi_oxidation
+          model pdipy_oxidation
             # kinetic expressions
-            ps -> e_ps; {k_ps}*{hv}*ps - ({ps_relaxation}*e_ps)
-            mo -> so;  {qy}*{k_so}*e_ps*mo - ({so_relaxation}*so)
-            so + fa -> ofa; {k_fa}*so*fa
+            ps -> e_ps; {k_ps}*{hv}*ps 
+            ps => b_ps ; {k_hv_ps}*ps
+            e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - ({k_rlx_so}*so)
+            so + fa => ofa; {k_fa}*so*fa
 
-            # define the first expression 
+            # define concentrations
             ps = {ps}
             e_ps = 0
-            
-            # define the second equation
+            b_ps = 0
             mo = {mo}
             so = 0
-            
-            # define the third expression
             ofa = 0
             fa = {fa}
             
-            # define constants
+            # calculate the oxidation proportion
             oxidation := ofa / (ofa + fa);
             
           end
@@ -347,7 +366,7 @@ class PDIBacterialPkg():
         # define the SEDML plot
         total_points = self.parameters['total_time (s)'] / self.parameters['timestep (s)'] 
         self.phrasedml_str = '''
-          model1 = model "pdi_oxidation"
+          model1 = model "pdipy_oxidation"
           sim1 = simulate uniform({}, {}, {})
           task1 = run sim1 on model1
           plot "Oxidation proportion of prokaryotic membrane fatty acids" time vs oxidation
@@ -355,6 +374,8 @@ class PDIBacterialPkg():
         
         # execute the model
         tellurium_model = tellurium.loada(self.model)            
+#         tellurium_model.draw()
+#         print(tellurium_model.draw())
         result = tellurium_model.simulate(self.parameters['initial_time'], int(self.parameters['total_time (s)']), int(total_points))
         
         # process the data
@@ -362,16 +383,15 @@ class PDIBacterialPkg():
         self.result_df.index = self.result_df[0]
         del self.result_df[0]
         self.result_df.index.name = 'Time (s)'
-        self.result_df.columns = ['[ps]', '[e_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
+        self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
         
         if self.verbose:
             message1 = tellurium_model.getCurrentAntimony()
             message2 = '\nCurrent integrator:', '\n', tellurium_model.integrator
-            message3 = self.result_df
-            self.messages.extend([message1, message2, message3])
-
+            self.messages.extend([message1, message2])
             print(message1)
             print(message2)
+            
             if self.jupyter:
                 display(self.result_df)
             else:

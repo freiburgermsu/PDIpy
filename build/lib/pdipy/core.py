@@ -74,7 +74,6 @@ class PDIBacterialPkg():
                 photosensitizer_mg_per_sqr_cm = self.parameters['photosensitizer_mg_per_disc']/self.parameters['cm2_per_disc']
             self.parameters['photosensitizer_mg_per_sqr_cm'] = photosensitizer_mg_per_sqr_cm
             
-
         elif surface_area is None:
             self.parameters['solution_volume (m^3)'] = solution_volume*micro*liter
             self.parameters['solution_depth (m)'] = solution_depth*centi
@@ -99,7 +98,7 @@ class PDIBacterialPkg():
         self.bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['root_path'], bacterial_specie)))[bacterial_specie]
         self.membrane_chemicals = self.bacterium['membrane_chemicals']
 
-    def define_photosensitizer(self, photosensitizer_molar = None, photosensitizer = 'A3B_4Zn'):
+    def define_photosensitizer(self, photosensitizer_molar = None, photosensitizer = 'A3B_4Zn', molecular_proportion = None, photosensitizer_moles_per_square_cm = None):
         # load the photosensitizer parameters
         self.parameters['photosensitizer_selection'] = photosensitizer
         self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['root_path'])))[photosensitizer]
@@ -108,29 +107,73 @@ class PDIBacterialPkg():
         
         self.parameters['atomic_thickness'] = 1.5 * angstrom   # https://www.nature.com/articles/ncomms1291
         if self.parameters['photosensitizer_selection'] == 'A3B_4Zn':
-            # calculate the volume of photosensitizing region in the molecule
+            # calculate the volume of conjugated region of the photosensitizer
             self.variables['center_porphyrin_length'] = (2*(chemical_dimensions['bond']['c-c']*(2*cos(radians(chemical_dimensions['angle']['sp2']-90))+cos(radians(180-chemical_dimensions['angle']['sp2']))))) * angstrom
             self.variables['sp2_extension'] = (chemical_dimensions['bond']['c-c'] * (2 + cos(radians(180-chemical_dimensions['angle']['sp2']))) + chemical_dimensions['bond']['c-n'] * cos(radians(180-chemical_dimensions['angle']['sp2'])) + chemical_dimensions['bond']['c-n']) * angstrom
             self.variables['sp3_diazirine'] = (chemical_dimensions['bond']['c-c']*cos(radians(chemical_dimensions['angle']['sp3']-90)) + 2*chemical_dimensions['bond']['c-c']*(1+cos(radians(180-chemical_dimensions['angle']['sp2']))) + chemical_dimensions['bond']['c-c']*sin(radians(chemical_dimensions['angle']['sp3']-90)) + chemical_dimensions['bond']['c-f']) * angstrom
+            self.variables['linked_sp3_diazirine'] = (chemical_dimensions['bond']['c-c']*cos(radians(chemical_dimensions['angle']['sp3']-90)) + 2*chemical_dimensions['bond']['c-c']*(1+cos(radians(180-chemical_dimensions['angle']['sp2']))) + chemical_dimensions['bond']['c-c']*sin(radians(chemical_dimensions['angle']['sp3']-90))) * angstrom
+            
             total_length = self.variables['center_porphyrin_length'] + 2*(self.variables['sp2_extension'] + self.variables['sp3_diazirine'])
+            linked_total_length = self.variables['center_porphyrin_length'] + 2*self.variables['sp2_extension'] + self.variables['sp3_diazirine'] + self.variables['linked_sp3_diazirine']
 
         if not self.surface_system:
             self.parameters['photosensitizer_molar'] = photosensitizer_molar
             self.variables['photosensitizers'] = (self.parameters['photosensitizer_molar']*N_A) * (self.parameters['solution_volume (m^3)']/liter)
         else:
-            self.variables['photosensitizers'] = self.parameters['photosensitizer_mg_per_sqr_cm']*milli/centi**2/self.photosensitizer['mw']['value'] * N_A
-            self.parameters['solution_volume (m^3)'] = self.parameters['surface_area (m^2)']* average(total_length,self.parameters['atomic_thickness'])
+            self.variables['photosensitizers'] = self.parameters['photosensitizer_mg_per_sqr_cm']*milli/centi**2 / self.photosensitizer['mw']['value']*N_A * self.parameters['surface_area (m^2)']
+            self.parameters['solution_volume (m^3)'] = self.parameters['surface_area (m^2)']*linked_total_length
             self.parameters['photosensitizer_molar'] = self.variables['photosensitizers']/N_A / (self.parameters['solution_volume (m^3)']/liter)
             
+        # determine the individual molecular components
+        if self.parameters['photosensitizer_selection'] == 'A3B_4Zn':
+            conjugated_length = self.variables['center_porphyrin_length'] + 2*self.variables['sp2_extension']
+
+        # calculate the proportion of well volume that is constituted by the molecular volume, in meters
+        self.variables['molecular_volume (m^3)'] = conjugated_length**2 * self.parameters['atomic_thickness']
+        molecules_volume = (self.variables['photosensitizers'] * self.variables['molecular_volume (m^3)'])
+        self.variables['volume_proportion'] = molecules_volume / self.parameters['solution_volume (m^3)']
+
+        # calculate the layer distribution for a slice 
+        if photosensitizer_moles_per_square_cm:
+            photosensitizers_layer_area = self.parameters['photosensitizers_per_square_cm'] * centi**2
+            self.parameters['photosensitizers'] = photosensitizer_moles_per_square_cm * N_A * photosensitizers_layer_area
+        else:
+            tilted_height = conjugated_length*float(sin(radians(45)))
+            layers = 1
+            self.parameters['solution_depth (m)'] = None
+            if not self.surface_system:
+                layers = self.parameters['solution_depth (m)'] / tilted_height
+            photosensitizers_per_layer = self.variables['photosensitizers'] / layers
+            orthogonal_area = pi*(conjugated_length)**2
+            parallel_area = (conjugated_length)*self.parameters['atomic_thickness']
+            photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
+            
+        # calculate the volume proportion in the cross-linked layer
+#         self.parameters['layer_volume (m^3)'] = 
+        self.variables['volume_proportion'] = molecules_volume / self.parameters['layer_volume (m^3)']
+
+        # total porphyrin area proportion
+        self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)']               
+        self.defined_model = True
         if self.verbose:
             message1 = 'The center porphyrin object is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length']))
             message2 = 'The benzyl extension is {} meters'.format(sigfigs_conversion(self.variables['sp2_extension']))
             message3 = 'The diazirine is {} meters'.format(sigfigs_conversion(self.variables['sp3_diazirine']))
-            self.messages.extend([message1, message2, message3])
+            message4 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
+            message5 = f'The molecular length is {sigfigs_conversion(conjugated_length)} meters'
+            message6 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
+            message7 = 'The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion']))
+            message8 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
+            self.messages.extend([message1, message2, message3, messasge4, message5, message6, messasge7, message8])
             
             print(message1)
             print(message2)
             print(message3)
+            print(message4)
+            print(message5)            
+            print(message6)
+            print(message7)
+            print(message8)
 
     def define_light(self, light_source, irradiance = None, exposure = None, simulation_time = None, lux = None, lumens = None, wattage = None, distance = None, reflection = False):
         self.parameters['visible (nm)'] = {'upper': 780 * nano, 'lower': 390 * nano}
@@ -153,47 +196,6 @@ class PDIBacterialPkg():
             error = '--> ERROR: The light source has an unrecognized dimension.'
             self.messages.append(error)
             print(error)
-
-    def define_photosensitizer_volume(self, molecular_proportion = None, photosensitizer_moles_per_square_cm = None):
-        # determine the individual molecular components
-        if self.parameters['photosensitizer_selection'] == 'A3B_4Zn':
-            conjugated_length = self.variables['center_porphyrin_length'] + 2*self.variables['sp2_extension']
-
-        # calculate the proportion of well volume that is constituted by the molecular volume, in meters
-        self.variables['molecular_volume (m^3)'] = conjugated_length**2 * self.parameters['atomic_thickness']
-        self.variables['volume_proportion'] = (self.variables['photosensitizers'] * self.variables['molecular_volume (m^3)']) / self.parameters['solution_volume (m^3)']
-
-        # calculate the layer distribution for a slice 
-        if photosensitizer_moles_per_square_cm:
-            photosensitizers_layer_area = self.parameters['photosensitizers_per_square_cm'] * centi**2
-            self.parameters['photosensitizers'] = photosensitizer_moles_per_square_cm * N_A * photosensitizers_layer_area
-        else:
-            tilted_height = conjugated_length*float(sin(radians(45)))
-            layers = 1
-            self.parameters['solution_depth (m)'] = None
-            if not self.surface_system:
-                layers = self.parameters['solution_depth (m)'] / tilted_height
-            photosensitizers_per_layer = self.variables['photosensitizers'] / layers
-            orthogonal_area = pi*(conjugated_length)**2
-            parallel_area = (conjugated_length)*self.parameters['atomic_thickness']
-            photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
-
-        # total porphyrin area proportion
-        self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)']               
-        self.defined_model = True
-        if self.verbose:
-            message1 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
-            message2 = f'The molecular length is {sigfigs_conversion(conjugated_length)} meters'
-            message3 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
-            message4 = 'The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion']))
-            message5 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
-            self.messages.extend([message1, message2, message3, messasge4, message5])
-            
-            print(message1)
-            print(message2)
-            print(message3)
-            print(message4)
-            print(message5)
 
     def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5):
         if not self.defined_model:
@@ -224,9 +226,9 @@ class PDIBacterialPkg():
             mw_molecular_oxygen = periodic_table.O.MW*2*kilo          #mg / mole
             dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted for the material surface system to only consider oxygen in the water in the vacinity of the surface material photosensitizer. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume.    
             if self.parameters['medium'] == 'air':
-                self.variables['mo_relaxation'] = 1e4
+                self.variables['so_relaxation'] = 1e4
             if self.parameters['medium'] == 'water':
-                self.variables['mo_relaxation'] = 1e10
+                self.variables['so_relaxation'] = 1e10
             self.variables['ps_relaxation'] = 1e4
             self.variables['dissolved_mo_molar'] = dissolved_oxygen_concentration*milli / mw_molecular_oxygen # * self.parameters['well_solution_volume'] * N_A
             estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time (s)'] * self.variables['volume_proportion']
@@ -262,7 +264,7 @@ class PDIBacterialPkg():
                 return volume       
             
             # calculate the cellular dimensions
-            self.variables['cell_radius (m)'] = pow((self.bacterium['cell_volume (pL)']['value'] * pico  / liter * 3) / (4 * pi), 1/3)
+            self.variables['cell_radius (m)'] = pow((self.bacterium['cell_volume (pL)']['value']*pico/liter*3) / (4*pi), 1/3)
             membrane_inner_radius = self.variables['cell_radius (m)'] - self.bacterium['membrane_thickness (nm)']['value'] * nano
 
             # calculate the cellular and oxidation volumes
@@ -288,39 +290,42 @@ class PDIBacterialPkg():
                         
             self.variables['fa_g/L_conc'] /= total_proportion
             self.variables['fa_molar'] /= total_proportion
-            self.variables['k'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
-            if self.verbose:
-                message1 = 'oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio']
-                message2 = 'volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7)
-                self.messages.extend([message1, message2])
+            
+        self.variables['k_fa'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
+        if self.verbose:
+            message1 = 'oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio']
+            message2 = 'volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7)
+            self.messages.extend([message1, message2])
 
-                print(message1)
-                print(message2)
+            print(message1)
+            print(message2)
 
     def kinetic_calculation(self): 
         # define the first equation
         ps = self.parameters['photosensitizer_molar']
         hv = self.variables['photon_moles_per_timestep']
         qy = self.variables['quantum_yield']
+        k_ps = self.variables['k_ps'] = 1e10
         
         # define the second equation
         mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
+        k_so = self.variables['k_so'] = 1e10
         
         # define the third equation
-        k = self.variables['k'] # 1/sec
+        k_fa = self.variables['k_fa'] # 1/sec
         fa = self.variables['fa_molar']
         
         # define constants
-        mo_relaxation = self.variables['mo_relaxation']
+        so_relaxation = self.variables['so_relaxation']
         ps_relaxation = self.variables['ps_relaxation']
 
         # define the SBML model
         self.model = (f'''
           model pdi_oxidation
             # kinetic expressions
-            ps -> e_ps; {hv}*ps - ({ps_relaxation}*e_ps)
-            mo -> so;  {qy}*e_ps*mo - ({mo_relaxation}*so)
-            so + fa -> ofa; {k}*so*fa
+            ps -> e_ps; {k_ps}*{hv}*ps - ({ps_relaxation}*e_ps)
+            mo -> so;  {qy}*{k_so}*e_ps*mo - ({so_relaxation}*so)
+            so + fa -> ofa; {k_fa}*so*fa
 
             # define the first expression 
             ps = {ps}
@@ -405,7 +410,7 @@ class PDIBacterialPkg():
         
         # export the figure
         figure_path = os.path.join(self.simulation_path, 'output.svg')
-        pyplot.rcParams['figure.figsize'] = (15, 9)
+        pyplot.rcParams['figure.figsize'] = (11, 7)
         pyplot.rcParams['figure.dpi'] = 150
         figure, ax = pyplot.subplots()
         ax.plot(x_values, oxidation_y_values, label = 'oxidation_proportion')
@@ -458,9 +463,9 @@ class PDIBacterialPkg():
         self.define_bacterium(bacterial_species)
         self.define_photosensitizer(photosensitizer_conc, photosensitizer)
         self.define_light(light_source, irradiance, well_surface_area, exposure, simulation_time)
-        self.define_photosensitizer_volume(molecular_proportion = None)
+        self.photosensitizer_proportion(molecular_proportion = None)
         
-    def time_to_threshold(self, timestep, total_time, kinetc_constant, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'time', y_label = 'oxidation proportion'):
+    def execute(self, timestep, total_time, kinetc_constant, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'time', y_label = 'oxidation proportion'):
         self.singlet_oxygen_calculations(timestep, total_time, kinetc_constant)
         self.geometric_oxidation()
         raw_data = self.kinetic_calculation()
