@@ -219,9 +219,10 @@ class PDIBacterialPkg():
         
         # excited photosensitizer lifetime
         self.variables['e_ps_charge_transfer'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007     
+        self.variables['e_ps_decay_time (s)'] = 1.5 * nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999
         
         # photobleaching
-        self.variables['hv_photobleaching'] = 0.015 * (self.parameters['watts']/self.parameters['surface_area (m^2)'])  # “Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005
+        self.variables['hv_photobleaching'] = 0.015 * (self.parameters['watts']/self.parameters['surface_area (m^2)'])  # “Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005   ; similar to “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987
             
         if 'watts' in self.parameters:                   
             # define the light watts
@@ -318,16 +319,19 @@ class PDIBacterialPkg():
     def kinetic_calculation(self): 
         # define photosensitizer excitation
         ps = self.parameters['photosensitizer_molar']
-        hv = self.variables['photon_moles_per_timestep']
+        hv = self.variables['photon_moles_per_timestep']/self.parameters['timestep (s)']
         qy = self.variables['quantum_yield']
-        k_ps = self.variables['k_ps'] = 1e10
+        vol_pro = self.variables['volume_proportion']
         
         # define photosensitizer photobleaching
-        k_hv_ps = self.variables['hv_photobleaching']
+        k_b_ps = self.variables['hv_photobleaching']
         
 #         self.parameters['so_rise_time (s)']
         
         # define singlet oxygen generation
+        mo_const = ''
+        if not self.surface_system:
+            mo_const = 'const mo'
         mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
         k_so = 1/self.variables['e_ps_charge_transfer']
         k_rlx_so = 1/self.variables['so_decay_time (s)']
@@ -338,15 +342,15 @@ class PDIBacterialPkg():
         
         # define constants
 #         so_relaxation = self.variables['so_relaxation']
-#         ps_relaxation = self.variables['ps_relaxation'] # - ({ps_relaxation}*e_ps)
+        k_ps_rlx = 1/self.variables['e_ps_decay_time (s)']
 
         # define the SBML model
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
-            ps -> e_ps; {k_ps}*{hv}*ps 
-            ps => b_ps ; {k_hv_ps}*ps
-            e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - ({k_rlx_so}*so)
+            ps -> e_ps; {vol_pro}*{hv} - {k_ps_rlx}*e_ps
+            ps => b_ps ; {k_b_ps}*ps
+            e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - {k_rlx_so}*so
             so + fa => ofa; {k_fa}*so*fa
 
             # define concentrations
@@ -360,6 +364,7 @@ class PDIBacterialPkg():
             
             # calculate the oxidation proportion
             oxidation := ofa / (ofa + fa);
+            {mo_const};
             
           end
         ''')       
@@ -383,7 +388,10 @@ class PDIBacterialPkg():
         self.result_df.index = self.result_df[0]
         del self.result_df[0]
         self.result_df.index.name = 'Time (s)'
-        self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
+        if self.surface_system:
+            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
+        else:
+            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[so]', '[fa]', '[ofa]']
         
         if self.verbose:
             message1 = tellurium_model.getCurrentAntimony()
@@ -408,7 +416,7 @@ class PDIBacterialPkg():
             x_values.append(index/minute) # sigfigs_conversion(index))
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_y_values.append(oxidation_proportion)
-            excitation_proportion = point['[ps]'] / (point['[ps]']+point['[e_ps]']) 
+            excitation_proportion = point['[e_ps]'] / (point['[ps]']+point['[e_ps]']) 
             excitation_y_values.append(excitation_proportion)
         
         # define the simulation_path

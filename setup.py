@@ -9,7 +9,7 @@ setup(
   package_dir = {'core':'pdipy'},
   packages = find_packages(),
   package_data = {'pdipy': ['parameters/*.json']}, 
-  version = '0.0.4',
+  version = '0.0.5',
   license = 'GNU',
   description = "A tool for calculating cellular oxidation and death via photodynamic inactivation.", 
   long_description = readme,
