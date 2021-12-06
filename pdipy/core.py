@@ -149,8 +149,8 @@ class PDIBacterialPkg():
             photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
             
         # calculate the volume proportion in the cross-linked layer
-        self.parameters['layer_volume (m^3)'] = self.parameters['solution_volume (m^3)'] / layers
-        self.variables['volume_proportion'] = molecules_volume / self.parameters['layer_volume (m^3)']
+#         self.parameters['layer_volume (m^3)'] = self.parameters['solution_volume (m^3)'] / layers
+#         self.variables['volume_proportion'] = molecules_volume / self.parameters['layer_volume (m^3)']
 
         # total porphyrin area proportion
         self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)']               
@@ -210,32 +210,19 @@ class PDIBacterialPkg():
         self.parameters['initial_time'] = initial_time
         self.parameters['total_time (s)'] = total_time * minute
         self.parameters['timestep (s)'] = timestep * minute
-        
-        # SO lifetime determination
-        cfu_lifetime_slope = (40-10) / (1E8-1E4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
-        initial_lifetime = 10
-        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*bacterial_cfu_ml+initial_lifetime) * micro 
-        self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
-        
-        # excited photosensitizer lifetime
-        self.variables['e_ps_charge_transfer'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007     
-        self.variables['e_ps_decay_time (s)'] = 1.5 * nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999
-        
-        # photobleaching
-        self.variables['hv_photobleaching'] = 0.015 * (self.parameters['watts']/self.parameters['surface_area (m^2)'])  # “Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005   ; similar to “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987
             
         if 'watts' in self.parameters:                   
             # define the light watts
             effective_visible_light_watts = self.parameters['watts'] * self.parameters['visible_proportion']
             visible_region = self.parameters['visible (nm)']['upper'] - self.parameters['visible (nm)']['lower']
-            excitation_visible_proportion = ((self.parameters['soret (m)']['upper'] - self.parameters['soret (m)']['lower'])) / visible_region
+            excitation_visible_proportion = (self.parameters['q (m)']['upper'] - self.parameters['soret (m)']['lower']) / visible_region
             effective_excitation_watts = excitation_visible_proportion * effective_visible_light_watts  # homogeneous light intesity throughout the visible spectrum is assumed
             
             # photonic calculations
             average_excitation_wavelength = (self.parameters['q (m)']['upper'] + self.parameters['soret (m)']['lower']) / 2
             joules_per_photon = (h * c) / average_excitation_wavelength
-            photons_per_second = effective_excitation_watts / joules_per_photon
-            self.variables['photon_moles_per_timestep'] = photons_per_second * self.parameters['timestep (s)'] / N_A
+            self.variables['photon_moles_per_second'] = effective_excitation_watts / joules_per_photon / N_A
+            self.variables['photon_moles_per_timestep'] = self.variables['photon_moles_per_second'] * self.parameters['timestep (s)']
             
             # singlet oxygen calculations
             '''so_from_light = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
@@ -247,7 +234,6 @@ class PDIBacterialPkg():
 #                 self.variables['so_relaxation'] = 1e10
 #             self.variables['ps_relaxation'] = 1e4
             self.variables['dissolved_mo_molar'] = dissolved_oxygen_concentration*milli / mw_molecular_oxygen # * self.parameters['well_solution_volume'] * N_A
-            estimated_excited_photosensitizers = photons_per_second * self.parameters['total_time (s)'] * self.variables['volume_proportion']
 
             # define the kinetic parameters
             self.variables['quantum_yield'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
@@ -256,18 +242,30 @@ class PDIBacterialPkg():
             if self.verbose:
                 message1 = 'photons per timestep: ', self.variables['photon_moles_per_timestep']
                 message2 = 'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar'])
-                message3 = 'excited photosensitizer molecules: ', sigfigs_conversion(estimated_excited_photosensitizers)
                 message4 = 'effective excitation watts: ', sigfigs_conversion(effective_excitation_watts)
-                self.messages.extend([message1, message2, message3, message4])
+                self.messages.extend([message1, message2, message4])
 
                 print(message1)
                 print(message2)
-                print(message3)
                 print(message4)
         else:
             error = '--> ERROR: The singlet oxygen generation cannot be calculated from the light source'
             self.messages.append(error)
             print(error)
+        
+        # SO lifetime determination
+        cfu_lifetime_slope = (40-10) / (1E8-1E4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
+        initial_lifetime = 10
+        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*bacterial_cfu_ml+initial_lifetime) * micro 
+        self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
+        
+        # excited photosensitizer lifetime
+        self.variables['e_ps_charge_transfer (s)'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007     
+        self.variables['e_ps_decay_time (s)'] = 1.5 * nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999
+        self.variables['ps_excitation (s)'] = self.parameters['photosensitizer_molar']/(self.variables['photon_moles_per_second']*self.variables['volume_proportion'])  # 50*femto # an estimated time that is below the detection limit of femto-second laser spectrophotometers ; literature has not been discovered that illuminates this time.
+        
+        # photobleaching
+        self.variables['hv_photobleaching'] = 0.015 * (self.parameters['watts']/(self.parameters['surface_area (m^2)']/centi**2))  # “Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005   ; similar to “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987
             
     def geometric_oxidation(self):
         if self.bacterium['shape']['value'] == "sphere":
@@ -319,9 +317,9 @@ class PDIBacterialPkg():
     def kinetic_calculation(self): 
         # define photosensitizer excitation
         ps = self.parameters['photosensitizer_molar']
-        hv = self.variables['photon_moles_per_timestep']/self.parameters['timestep (s)']
+        hv = self.variables['volume_proportion']*self.variables['photon_moles_per_timestep'] # ['photons_moles_per_second']
         qy = self.variables['quantum_yield']
-        vol_pro = self.variables['volume_proportion']
+        k_e_ps = 1/self.variables['ps_excitation (s)']
         
         # define photosensitizer photobleaching
         k_b_ps = self.variables['hv_photobleaching']
@@ -330,10 +328,10 @@ class PDIBacterialPkg():
         
         # define singlet oxygen generation
         mo_const = ''
-        if not self.surface_system:
-            mo_const = 'const mo'
+#         if not self.surface_system:
+#             mo_const = 'const mo'
         mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
-        k_so = 1/self.variables['e_ps_charge_transfer']
+        k_so = 1/self.variables['e_ps_charge_transfer (s)']
         k_rlx_so = 1/self.variables['so_decay_time (s)']
         
         # define the third equation
@@ -348,10 +346,10 @@ class PDIBacterialPkg():
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
-            ps -> e_ps; {vol_pro}*{hv} - {k_ps_rlx}*e_ps
+            ps -> e_ps; {k_e_ps}*ps - {k_ps_rlx}*e_ps
             ps => b_ps ; {k_b_ps}*ps
             e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - {k_rlx_so}*so
-            so + fa => ofa; {k_fa}*so*fa
+            so + fa => ofa + mo; {k_fa}*so*fa
 
             # define concentrations
             ps = {ps}
@@ -388,10 +386,10 @@ class PDIBacterialPkg():
         self.result_df.index = self.result_df[0]
         del self.result_df[0]
         self.result_df.index.name = 'Time (s)'
-        if self.surface_system:
-            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
-        else:
-            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[so]', '[fa]', '[ofa]']
+#         if self.surface_system:
+        self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
+#         else:
+#             self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[so]', '[fa]', '[ofa]']
         
         if self.verbose:
             message1 = tellurium_model.getCurrentAntimony()
@@ -416,7 +414,7 @@ class PDIBacterialPkg():
             x_values.append(index/minute) # sigfigs_conversion(index))
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_y_values.append(oxidation_proportion)
-            excitation_proportion = point['[e_ps]'] / (point['[ps]']+point['[e_ps]']) 
+            excitation_proportion = point['[e_ps]'] / (point['[ps]']+point['[e_ps]']+point['[b_ps]']) 
             excitation_y_values.append(excitation_proportion)
         
         # define the simulation_path
