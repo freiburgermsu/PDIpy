@@ -1,5 +1,5 @@
 # import libraries
-from scipy.constants import femto, pico, angstrom, nano, micro, milli, centi, kilo, liter, N_A, h, c, minute
+from scipy.constants import femto, pico, angstrom, nano, micro, milli, centi, kilo, liter, N_A, h, c, minute, hour
 from math import pow, pi, sin, cos, radians, ceil
 from chemicals.elements import periodic_table
 from matplotlib import pyplot
@@ -63,9 +63,11 @@ class PDIBacterialPkg():
         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = os.path.dirname(__file__)
         
-    def define_system(self, surface_area = None, solution_volume = None, solution_depth = None, photosensitizer_mg_per_sqr_cm = None, surface_system = False, medium = 'water'):
+    def define_system(self, surface_area = None, solution_volume = None, solution_depth = None, photosensitizer_mg_per_sqr_cm = None, surface_system = False, biofilm = False, individual_cell = False, medium = 'water'):
         # parameterize the photosensitizer system
         self.surface_system = surface_system
+        self.biofilm = biofilm
+        self.individual_cell = individual_cell
         self.parameters['medium'] = medium
         if self.surface_system:
             if photosensitizer_mg_per_sqr_cm is None:
@@ -102,7 +104,7 @@ class PDIBacterialPkg():
     def define_photosensitizer(self, photosensitizer_molar = None, photosensitizer = 'A3B_4Zn', molecular_proportion = None, photosensitizer_moles_per_square_cm = None):
         # load the photosensitizer parameters
         self.parameters['photosensitizer_selection'] = photosensitizer
-        self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['root_path'])))[photosensitizer]
+        self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['root_path']), encoding='utf-8'))[photosensitizer]
         self.parameters['soret (m)'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
         self.parameters['q (m)'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
         
@@ -199,7 +201,7 @@ class PDIBacterialPkg():
             self.messages.append(error)
             print(error)
 
-    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E8):
+    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E6):
         if not self.defined_model:
             import sys
             error = 'ERROR: The model must first be defined.'
@@ -207,6 +209,7 @@ class PDIBacterialPkg():
             sys.exit(error)
             
         # timestep conditions
+        self.bacterial_cfu_ml = bacterial_cfu_ml
         self.parameters['initial_time'] = initial_time
         self.parameters['total_time (s)'] = total_time * minute
         self.parameters['timestep (s)'] = timestep * minute
@@ -256,16 +259,22 @@ class PDIBacterialPkg():
         # SO lifetime determination
         cfu_lifetime_slope = (40-10) / (1E8-1E4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
         initial_lifetime = 10
-        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*bacterial_cfu_ml+initial_lifetime) * micro 
+        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*bacterial_cfu_ml+initial_lifetime) * micro
+        if self.variables['so_decay_time (s)'] < 4*micro:
+            self.variables['so_decay_time (s)'] = 4*micro  # a minimum lifetime of 4 microseconds is parameterized for the default in a complete aqueous solution 
         self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
         
         # excited photosensitizer lifetime
         self.variables['e_ps_charge_transfer (s)'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007     
         self.variables['e_ps_decay_time (s)'] = 1.5 * nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999
-        self.variables['ps_excitation (s)'] = self.parameters['photosensitizer_molar']/(self.variables['photon_moles_per_second']*self.variables['volume_proportion'])  # 50*femto # an estimated time that is below the detection limit of femto-second laser spectrophotometers ; literature has not been discovered that illuminates this time.
+        self.variables['ps_excitation (s)'] = 50*femto # an estimated time that is below the detection limit of femto-second laser spectrophotometers ; literature has not been discovered that illuminates this time. # self.parameters['photosensitizer_molar']/(self.variables['photon_moles_per_second']*self.variables['volume_proportion'])  # 
         
         # photobleaching
-        self.variables['hv_photobleaching'] = 0.015 * (self.parameters['watts']/(self.parameters['surface_area (m^2)']/centi**2))  # “Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005   ; similar to “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987
+        self.variables['hv_photobleaching'] = self.photosensitizer['photobleaching_constant (cm^2/J)']['value'] * (self.parameters['watts']/(self.parameters['surface_area (m^2)']/centi**2))
+        
+        # eps oxidation
+        if self.biofilm:
+            self.variables['eps_oxidation'] = 1e10 # empirical rate constant that represents a biofilm system from the single cellular kinetic model via a competiting oxidation reaction of EPS versus fatty acids   
             
     def geometric_oxidation(self):
         if self.bacterium['shape']['value'] == "sphere":
@@ -306,6 +315,9 @@ class PDIBacterialPkg():
             self.variables['fa_molar'] /= total_proportion
             
         self.variables['k_fa'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
+        if not self.biofilm and not self.individual_cell:
+            self.variables['k_fa'] /= 10**2.25
+        
         if self.verbose:
             message1 = 'oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio']
             message2 = 'volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7)
@@ -320,6 +332,7 @@ class PDIBacterialPkg():
         hv = self.variables['volume_proportion']*self.variables['photon_moles_per_timestep'] # ['photons_moles_per_second']
         qy = self.variables['quantum_yield']
         k_e_ps = 1/self.variables['ps_excitation (s)']
+        k_ps_rlx = 1/self.variables['e_ps_decay_time (s)']
         
         # define photosensitizer photobleaching
         k_b_ps = self.variables['hv_photobleaching']
@@ -334,13 +347,14 @@ class PDIBacterialPkg():
         k_so = 1/self.variables['e_ps_charge_transfer (s)']
         k_rlx_so = 1/self.variables['so_decay_time (s)']
         
-        # define the third equation
-        k_fa = self.variables['k_fa'] # 1/sec
+        # define fatty acid oxidation
+        k_fa = self.variables['k_fa']
         fa = self.variables['fa_molar']
         
-        # define constants
-#         so_relaxation = self.variables['so_relaxation']
-        k_ps_rlx = 1/self.variables['e_ps_decay_time (s)']
+        # define eps oxidation
+        biofilm = ''
+        if self.biofilm:
+            biofilm = 'so => o_eps + mo; {}*so'.format(self.variables['eps_oxidation'])
 
         # define the SBML model
         self.model = (f'''
@@ -349,7 +363,8 @@ class PDIBacterialPkg():
             ps -> e_ps; {k_e_ps}*ps - {k_ps_rlx}*e_ps
             ps => b_ps ; {k_b_ps}*ps
             e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - {k_rlx_so}*so
-            so + fa => ofa + mo; {k_fa}*so*fa
+            so + fa => o_fa + mo; {k_fa}*so*fa
+            {biofilm}
 
             # define concentrations
             ps = {ps}
@@ -357,11 +372,12 @@ class PDIBacterialPkg():
             b_ps = 0
             mo = {mo}
             so = 0
-            ofa = 0
+            o_fa = 0
             fa = {fa}
+            o_eps = 0
             
             # calculate the oxidation proportion
-            oxidation := ofa / (ofa + fa);
+            oxidation := o_fa / (o_fa + fa);
             {mo_const};
             
           end
@@ -386,10 +402,10 @@ class PDIBacterialPkg():
         self.result_df.index = self.result_df[0]
         del self.result_df[0]
         self.result_df.index.name = 'Time (s)'
-#         if self.surface_system:
-        self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
-#         else:
-#             self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[so]', '[fa]', '[ofa]']
+        if self.biofilm:
+            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]', '[oeps]']
+        else:
+            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
         
         if self.verbose:
             message1 = tellurium_model.getCurrentAntimony()
@@ -405,15 +421,18 @@ class PDIBacterialPkg():
             
         return self.result_df
         
-    def export(self, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (min)', y_label = 'proportion of total'):
+    def export(self, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (min)', y_label = 'proportion of total', excitation_proportion = False):
         # parse the simulation results
         x_values = []
         oxidation_y_values = []
         excitation_y_values = []
+        processed_data_dictionary = {}
         for index, point in self.result_df.iterrows():
             x_values.append(index/minute) # sigfigs_conversion(index))
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_y_values.append(oxidation_proportion)
+            processed_data_dictionary[index/hour] = oxidation_proportion
+            
             excitation_proportion = point['[e_ps]'] / (point['[ps]']+point['[e_ps]']+point['[b_ps]']) 
             excitation_y_values.append(excitation_proportion)
         
@@ -434,13 +453,21 @@ class PDIBacterialPkg():
         tellurium.exportInlineOmex(inline_omex, os.path.join(self.simulation_path, omex_file_name))
         self.result_df.to_csv(os.path.join(self.simulation_path, 'raw_data.csv'))
         
+        # export the processed data
+        processed_data = pandas.DataFrame(list(processed_data_dictionary.items()), columns = ['time (hr)','oxidation_proportion'])
+        processed_data.index = processed_data['time (hr)']
+        del processed_data['time (hr)']
+        processed_path = os.path.join(self.simulation_path, 'processed_data.csv')
+        processed_data.to_csv(processed_path)
+        
         # export the figure
         figure_path = os.path.join(self.simulation_path, 'output.svg')
         pyplot.rcParams['figure.figsize'] = (11, 7)
         pyplot.rcParams['figure.dpi'] = 150
         figure, ax = pyplot.subplots()
         ax.plot(x_values, oxidation_y_values, label = 'oxidation_proportion')
-        ax.plot(x_values, excitation_y_values, label = 'excitation_proportion')
+        if excitation_proportion:
+            ax.plot(x_values, excitation_y_values, label = 'excitation_proportion')
         ax.set_ylabel(y_label)
         ax.set_xlabel(x_label)
         ax.set_title(figure_title)
@@ -482,7 +509,9 @@ class PDIBacterialPkg():
             if self.jupyter:
                 display(variables_table)
             else:
-                print(variables_table)             
+                print(variables_table)     
+                
+        return processed_data
 
     def define(self, bacterial_species, photosensitizer, photosensitizer_conc, light_source, irradiance = None, well_surface_area = 1, exposure = None, simulation_time = None, molecular_proportion = None):
         # parameterize the simulation

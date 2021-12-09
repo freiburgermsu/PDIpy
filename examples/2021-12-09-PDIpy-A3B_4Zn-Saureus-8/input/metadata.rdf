@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' xmlns:dcterms='http://purl.org/dc/terms/' xmlns:vCard='http://www.w3.org/2006/vcard/ns#'>
+  <rdf:Description rdf:about='.'>
+    <dcterms:description>{"authoring_tool": "tellurium", "info": "Created with Tellurium (tellurium.analogmachine.org).", "version_info": {"tellurium": "2.2.0", "roadrunner": "2.0.5", "rrplugins": "2.0.5", "antimony": "2.12.0.3", "phrasedml": "1.1.0", "libsbml": "5.19.0", "libsedml": "2.0.25", "libcombine": "0.2.13"}}</dcterms:description>
+    <dcterms:created rdf:parseType='Resource'>
+      <dcterms:W3CDTF>2021-12-09T05:32:44Z</dcterms:W3CDTF>
+    </dcterms:created>
+  </rdf:Description>
+</rdf:RDF>

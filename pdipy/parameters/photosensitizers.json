@@ -24,7 +24,12 @@
 			"value": [ 530, 625 ],
 			"reference": null
 		},
-		"charge": 4
+		"charge": 4,
+		"photobleaching_constant (cm^2/J)": {
+			"value": 1.74e-7,
+			"reference": "“Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005",
+			"notes": "The 0.015 value from literature is divided by 8.64e4 -- the quantity of seconds in a day -- to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
+			}
 	},
 	"A3B_4Cu": {
 		"quantum_yield": {
@@ -51,7 +56,12 @@
 			"value": [ 530, 625 ],
 			"reference": null
 		},
-		"charge": 4
+		"charge": 4,
+		"photobleaching_constant (cm^2/J)": {
+			"value": 1.5e-12,
+			"reference": "“Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005",
+			"notes": "The 0.015 value from literature is attenuated by 1e-10 to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
+			}
 	},
 	"A3B_2Zn": {
 		"quantum_yield": {
@@ -78,7 +88,12 @@
 			"value": [ 530, 625 ],
 			"reference": null
 		},
-		"charge": 2
+		"charge": 2,
+		"photobleaching_constant (cm^2/J)": {
+			"value": 1.5e-12,
+			"reference": "“Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005",
+			"notes": "The 0.015 value from literature is attenuated by 1e-10 to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
+			}
 	},
 	"A3B_1Ga": {
 		"quantum_yield": {
@@ -105,6 +120,11 @@
 			"value": [ 530, 625 ],
 			"reference": null
 		},
-		"charge": 2
+		"charge": 2,
+		"photobleaching_constant (cm^2/J)": {
+			"value": 1.5e-12,
+			"reference": "“Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005",
+			"notes": "The 0.015 value from literature is attenuated by 1e-10 to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
+			}
 	}
 }
