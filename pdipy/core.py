@@ -63,6 +63,7 @@ class PDIBacterialPkg():
         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = os.path.dirname(__file__)
         
+        
     def define_system(self, surface_area = None, solution_volume = None, solution_depth = None, photosensitizer_mg_per_sqr_cm = None, surface_system = False, biofilm = False, individual_cell = False, medium = 'water'):
         # parameterize the photosensitizer system
         self.surface_system = surface_system
@@ -75,7 +76,7 @@ class PDIBacterialPkg():
                 self.parameters['cm2_per_disc'] = (1.56/2)**2*pi
                 self.parameters['surface_area (m^2)'] = self.parameters['cm2_per_disc']*centi**2
                 photosensitizer_mg_per_sqr_cm = self.parameters['photosensitizer_mg_per_disc']/self.parameters['cm2_per_disc']
-            self.parameters['photosensitizer_mg_per_sqr_cm'] = photosensitizer_mg_per_sqr_cm
+            self.parameters['photosensitizer (g/m^2)'] = photosensitizer_mg_per_sqr_cm*milli/centi**2
             
         elif surface_area is None:
             self.parameters['solution_volume (m^3)'] = solution_volume*micro*liter
@@ -91,6 +92,7 @@ class PDIBacterialPkg():
             self.parameters['solution_volume (m^3)'] = solution_volume*centi**3
             self.parameters['surface_area (m^2)'] = surface_area*centi**2
             self.parameters['solution_depth (m)'] = self.parameters['solution_volume (m^3)'] / self.parameters['surface_area (m^2)']
+            
                                         
     def define_bacterium(self, bacterial_specie):    
         self.results['cellular_vitality'] = True
@@ -100,13 +102,14 @@ class PDIBacterialPkg():
         self.parameters['bacterial_specie'] = bacterial_specie
         self.bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['root_path'], bacterial_specie)))[bacterial_specie]
         self.membrane_chemicals = self.bacterium['membrane_chemicals']
+        
 
-    def define_photosensitizer(self, photosensitizer_molar = None, photosensitizer = 'A3B_4Zn', molecular_proportion = None, photosensitizer_moles_per_square_cm = None):
+    def define_photosensitizer(self, photosensitizer_molar = None, photosensitizer = 'A3B_4Zn', molecular_proportion = None):
         # load the photosensitizer parameters
         self.parameters['photosensitizer_selection'] = photosensitizer
         self.photosensitizer = json.load(open('{}/parameters/photosensitizers.json'.format(self.parameters['root_path']), encoding='utf-8'))[photosensitizer]
-        self.parameters['soret (m)'] = {'upper': self.photosensitizer['soret (nm)']['value'][1] * nano, 'lower': self.photosensitizer['soret (nm)']['value'][0] * nano}
-        self.parameters['q (m)'] = {'upper': self.photosensitizer['q (nm)']['value'][1] * nano, 'lower': self.photosensitizer['q (nm)']['value'][0] * nano}
+        self.parameters['soret (m)'] = {'upper': self.photosensitizer['soret (nm)']['value'][1]*nano, 'lower': self.photosensitizer['soret (nm)']['value'][0]*nano}
+        self.parameters['q (m)'] = {'upper': self.photosensitizer['q (nm)']['value'][1]*nano, 'lower': self.photosensitizer['q (nm)']['value'][0]*nano}
         
         self.parameters['atomic_thickness'] = 1.5 * angstrom   # https://www.nature.com/articles/ncomms1291
         if self.parameters['photosensitizer_selection'] == 'A3B_4Zn':
@@ -123,7 +126,7 @@ class PDIBacterialPkg():
             self.parameters['photosensitizer_molar'] = photosensitizer_molar
             self.variables['photosensitizers'] = (self.parameters['photosensitizer_molar']*N_A) * (self.parameters['solution_volume (m^3)']/liter)
         else:
-            self.variables['photosensitizers'] = self.parameters['photosensitizer_mg_per_sqr_cm']*milli/centi**2 / self.photosensitizer['mw']['value']*N_A * self.parameters['surface_area (m^2)']
+            self.variables['photosensitizers'] = self.parameters['photosensitizer (g/m^2)'] / (self.photosensitizer['mw']['value']/N_A) * self.parameters['surface_area (m^2)']
             self.parameters['solution_volume (m^3)'] = self.parameters['surface_area (m^2)']*linked_total_length
             self.parameters['photosensitizer_molar'] = self.variables['photosensitizers']/N_A / (self.parameters['solution_volume (m^3)']/liter)
             
@@ -131,7 +134,7 @@ class PDIBacterialPkg():
         if self.parameters['photosensitizer_selection'] == 'A3B_4Zn':
             conjugated_length = self.variables['center_porphyrin_length'] + 2*self.variables['sp2_extension']
 
-        # calculate the proportion of well volume that is constituted by the molecular volume, in meters
+        # calculate the volume proportion that is constituted by the photosensitizer, in the volume where the photosensitizer is present
         self.variables['molecular_volume (m^3)'] = (linked_total_length/2)**2*pi * self.parameters['atomic_thickness']
         molecules_volume = self.variables['photosensitizers'] * self.variables['molecular_volume (m^3)']
         self.variables['volume_proportion'] = molecules_volume / self.parameters['solution_volume (m^3)']
@@ -139,25 +142,20 @@ class PDIBacterialPkg():
         print(self.parameters['solution_volume (m^3)'])
 
         # calculate the layer distribution for a slice 
-        if photosensitizer_moles_per_square_cm:
-            photosensitizers_layer_area = self.parameters['photosensitizers_per_square_cm'] * centi**2
-            self.parameters['photosensitizers'] = photosensitizer_moles_per_square_cm * N_A * photosensitizers_layer_area
-        else:
-            tilted_height = conjugated_length*float(sin(radians(45)))
+        message8 = ''
+        if not self.surface_system:
+            tilted_height = total_length*float(sin(radians(45)))
             layers = 1
             if not self.surface_system:
                 layers = self.parameters['solution_depth (m)'] / tilted_height
             photosensitizers_per_layer = self.variables['photosensitizers'] / layers
-            orthogonal_area = pi*(conjugated_length)**2
-            parallel_area = (conjugated_length)*self.parameters['atomic_thickness']
+            orthogonal_area = pi*(total_length)**2
+            parallel_area = (total_length)*self.parameters['atomic_thickness']
             photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
+            self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)'] 
+            message8 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
             
-        # calculate the volume proportion in the cross-linked layer
-#         self.parameters['layer_volume (m^3)'] = self.parameters['solution_volume (m^3)'] / layers
-#         self.variables['volume_proportion'] = molecules_volume / self.parameters['layer_volume (m^3)']
-
-        # total porphyrin area proportion
-        self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)']               
+        # print calculated content              
         self.defined_model = True
         if self.verbose:
             message1 = 'The tetrapyrrole is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length']))
@@ -169,11 +167,12 @@ class PDIBacterialPkg():
             message5 = f'The molecular length is {sigfigs_conversion(total_length)} meters'
             message6 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
             message7 = 'The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion']))
-            message8 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
+            
             messages = [message1, message2, message3, message4, message5, message6, message7, message8]
             self.messages.extend(messages)
             for message in messages:            
                 print(message)
+                
 
     def define_light(self, light_source, irradiance = None, exposure = None, simulation_time = None, lux = None, lumens = None, wattage = None, distance = None, reflection = False):
         self.parameters['visible (nm)'] = {'upper': 780 * nano, 'lower': 390 * nano}
@@ -188,7 +187,7 @@ class PDIBacterialPkg():
             simulation_time = simulation_time * minute
             self.parameters['watts'] = (exposure/centi**2) / simulation_time * self.parameters['surface_area (m^2)']
         elif lux is not None: # lumen / cm^2
-            irradiance =  (lux/centi**2) / light_parameters[light_source]['lumens_per_watt']['value']
+            irradiance = (lux/centi**2) / light_parameters[light_source]['lumens_per_watt']['value']
             self.parameters['watts'] = irradiance * self.parameters['surface_area (m^2)']
         elif lumens is not None: # lumen
             self.parameters['watts'] = lumens / light_parameters[light_source]['lumens_per_watt']['value']
@@ -197,7 +196,8 @@ class PDIBacterialPkg():
             self.messages.append(error)
             print(error)
 
-    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E6):
+            
+    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E6, excitation_calculation = False):
         if not self.defined_model:
             import sys
             error = 'ERROR: The model must first be defined.'
@@ -221,29 +221,21 @@ class PDIBacterialPkg():
             average_excitation_wavelength = (self.parameters['q (m)']['upper'] + self.parameters['soret (m)']['lower']) / 2
             joules_per_photon = (h * c) / average_excitation_wavelength
             non_reflected_photons = 0.96 # “SINGLET OXYGEN GENERATION BY PORPHYRINS AND THE PHOTOSENSITIZATION IN LIPOSOMES KINETICS OF 9,lO-DIMETHYLANTHRACENE” by Gross et al., 1993
-            self.variables['photon_moles_per_second'] = effective_excitation_watts*non_reflected_photons / joules_per_photon / N_A
-            self.variables['photon_moles_per_timestep'] = self.variables['photon_moles_per_second'] * self.parameters['timestep (s)']
+            self.variables['photon_moles_per_timestep'] = effective_excitation_watts*non_reflected_photons / joules_per_photon / N_A * self.parameters['timestep (s)']
             
             # singlet oxygen calculations
             '''so_from_light = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
             mw_molecular_oxygen = periodic_table.O.MW*2*kilo          #mg / mole
-            dissolved_oxygen_concentration = 9              # mg / L, ambient water quality criteria for DO, EPA         # this must be adjusted for the material surface system to only consider oxygen in the water in the vacinity of the surface material photosensitizer. The continuum assumption of the aqueous solution may be implemented such that only a oxygen within fractional volume of the total solution volume.    
-#             if self.parameters['medium'] == 'air':
-#                 self.variables['so_relaxation'] = 1e4
-#             if self.parameters['medium'] == 'water':
-#                 self.variables['so_relaxation'] = 1e10
-#             self.variables['ps_relaxation'] = 1e4
-            self.variables['dissolved_mo_molar'] = dissolved_oxygen_concentration*milli / mw_molecular_oxygen # * self.parameters['well_solution_volume'] * N_A
+            self.variables['dissolved_mo_molar'] = 9*milli/mw_molecular_oxygen    # mg / L, ambient water quality criteria for Dissolved Oxygen, EPA   
 
             # calculate the proportion of excited photosensitizers
-            self.variables['e_ps_calculated'] = self.variables['photon_moles_per_timestep']*self.variables['volume_proportion']*self.photosensitizer['quantum_yield']['value']
-            print('e_ps times greater than the photosensitizer molar', self.variables['e_ps_calculated']/self.parameters['photosensitizer_molar'])
-            if self.variables['e_ps_calculated'] > self.parameters['photosensitizer_molar']:
-                self.variables['e_ps_calculated'] = self.parameters['photosensitizer_molar']
-    
-            # define the kinetic parameters
-            self.variables['so_qy'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value']
-            
+            self.excitation_calculation = excitation_calculation
+            if self.excitation_calculation:
+                self.variables['e_ps_calculated'] = self.variables['photon_moles_per_timestep']*self.variables['volume_proportion']*self.photosensitizer['quantum_yield']['value']
+                print('e_ps times greater than the photosensitizer molar', self.variables['e_ps_calculated']/self.parameters['photosensitizer_molar'])
+                if self.variables['e_ps_calculated'] > self.parameters['photosensitizer_molar']:
+                    self.variables['e_ps_calculated'] = self.parameters['photosensitizer_molar']
+                
             if self.verbose:
                 message1 = 'photons per timestep: ', self.variables['photon_moles_per_timestep']
                 message2 = 'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar'])
@@ -257,25 +249,10 @@ class PDIBacterialPkg():
             self.messages.append(error)
             print(error)
         
-        # SO lifetime determination
-        cfu_lifetime_slope = (40-10) / (1E8-1E4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
-        initial_lifetime = 10
-        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*bacterial_cfu_ml+initial_lifetime) * micro
-        if self.variables['so_decay_time (s)'] < 4*micro:
-            self.variables['so_decay_time (s)'] = 4*micro  # a minimum lifetime of 4 microseconds is parameterized for the default in a complete aqueous solution 
-        self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
-        
-        # excited photosensitizer lifetime
-        self.variables['e_ps_charge_transfer (s)'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007     
-        self.variables['e_ps_decay_time (s)'] = 1.5 * nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999
-        self.variables['ps_excitation (s)'] = 50*femto # an estimated time that is below the detection limit of femto-second laser spectrophotometers ; literature has not been discovered that illuminates this time. # self.parameters['photosensitizer_molar']/(self.variables['photon_moles_per_second']*self.variables['volume_proportion'])  # 
-        
-        # photobleaching
-        self.variables['hv_photobleaching'] = self.photosensitizer['photobleaching_constant (cm^2/J)']['value'] * (self.parameters['watts']/(self.parameters['surface_area (m^2)']/centi**2))
-        
         # eps oxidation
         if self.biofilm:
             self.variables['eps_oxidation'] = 1e10 # empirical rate constant that represents a biofilm system from the single cellular kinetic model via a competiting oxidation reaction of EPS versus fatty acids   
+            
             
     def cytoplasmic_membrane(self):
         # fatty acid concentrations in the phospholipid membrane
@@ -283,47 +260,69 @@ class PDIBacterialPkg():
         for chemical in self.membrane_chemicals:
             if re.search('FA', chemical):
                 self.variables['fa_molar'] = self.membrane_chemicals[chemical]['density (g/L)']['value'] / average(self.membrane_chemicals[chemical]['mw']) * self.membrane_chemicals[chemical]['proportion']['value']
-                self.variables['fa_g/L_conc'] += self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value'] / milli
+                self.variables['fa_g/L_conc'] += self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value']
                 total_proportion += self.membrane_chemicals[chemical]['proportion']['value']
 
         self.variables['fa_g/L_conc'] /= total_proportion
         self.variables['fa_molar'] /= total_proportion
-            
-        self.variables['k_fa'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
-        if not self.biofilm and not self.individual_cell:
-            self.variables['k_fa'] /= 10**2.6
 
+        
     def kinetic_calculation(self): 
-        # define photosensitizer excitation
+        # ============= define photosensitizer excitation ==============
         ps = self.parameters['photosensitizer_molar']
-        hv = self.variables['volume_proportion']*self.variables['photon_moles_per_timestep'] # ['photons_moles_per_second']
-        qy = self.variables['so_qy']
-        k_e_ps = 1/self.variables['ps_excitation (s)']
-        k_ps_rlx = 1/self.variables['e_ps_decay_time (s)']
+        if not self.excitation_calculation:
+            e_fraction = (self.variables['volume_proportion']*self.variables['photon_moles_per_timestep'])/(self.variables['photosensitizers']/N_A)
+            if e_fraction > 1:
+                e_fraction = 1
+
+            self.variables['e_ps_decay_time (s)'] = 1.5 * nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999
+            self.variables['ps_excitation (s)'] = 50*femto # an estimated time that is below the detection limit of femto-second laser spectrophotometers ; literature has not been discovered that illuminates this time. # self.parameters['photosensitizer_molar']/(self.variables['photon_moles_per_timestep']*self.variables['volume_proportion']) 
+            k_e_ps = 1/self.variables['ps_excitation (s)']
+            k_ps_rlx = 1/self.variables['e_ps_decay_time (s)']        
+            qy_e = self.photosensitizer['quantum_yield']['value']
+            
+            photosensitizer = f'{k_e_ps}*{e_fraction}*{qy_e}*ps - {k_ps_rlx}*e_ps'
+        else:
+            photosensitizer = self.variables['e_ps_calculated']
         
-        # define photosensitizer photobleaching
-        k_b_ps = self.variables['hv_photobleaching']
+        # ============== define photobleaching ==============
+        k_b_ps = self.variables['hv_photobleaching'] = self.photosensitizer['photobleaching_constant (cm^2/J)']['value'] * (self.parameters['watts']/(self.parameters['surface_area (m^2)']/centi**2))
         
-        # define singlet oxygen generation
-        mo = self.variables['dissolved_mo_molar'] # self.variables['dissolved_mo_moles']
+        # ============== define singlet oxygen generation ==============
+        mo = self.variables['dissolved_mo_molar']
+        qy = self.variables['so_qy'] = self.photosensitizer['quantum_yield']['value'] * self.photosensitizer['so_specificity']['value'] 
+        self.variables['e_ps_charge_transfer (s)'] = 500 * nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002  & “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007 
         k_so = 1/self.variables['e_ps_charge_transfer (s)']
+        
+        cfu_lifetime_slope = (40-10) / (1E8-1E4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
+        initial_lifetime = 10
+        self.variables['so_decay_time (s)'] = (cfu_lifetime_slope*self.bacterial_cfu_ml+initial_lifetime)*micro
+        if self.variables['so_decay_time (s)'] < 4*micro:
+            self.variables['so_decay_time (s)'] = 4*micro  # a minimum lifetime of 4 microseconds is parameterized for the default in a complete aqueous solution 
         k_rlx_so = 1/self.variables['so_decay_time (s)']
         
-        # define fatty acid oxidation
-        k_fa = self.variables['k_fa']
-        fa = self.variables['fa_molar']
+        self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
         
-        # define eps oxidation
+        # ============== define fatty acid oxidation ==============
+        k_fa = self.variables['k_fa'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
+        fa = self.variables['fa_molar']
+        if not self.individual_cell:
+            if not self.biofilm:
+                fa /= 10**2.6
+            else:
+                fa /= 10**3
+        
+        # ============== define eps oxidation ==============
         biofilm = ''
         if self.biofilm:
             biofilm = 'so => o_eps + mo; {}*so'.format(self.variables['eps_oxidation'])
 
-        # define the SBML model
+        # ============== SBML kinetic model ==============
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
-            ps -> e_ps; {k_e_ps}*ps - {k_ps_rlx}*e_ps
-            ps => b_ps ; {k_b_ps}*ps
+            ps -> e_ps; {photosensitizer}
+            e_ps => b_ps ; {k_b_ps}*e_ps
             e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - {k_rlx_so}*so
             so + fa => o_fa + mo; {k_fa}*so*fa
             {biofilm}
@@ -343,7 +342,7 @@ class PDIBacterialPkg():
             
           end
         ''')       
-        # define the SEDML plot
+        # ============== model SED-ML plot ==============
         total_points = self.parameters['total_time (s)'] / self.parameters['timestep (s)'] 
         self.phrasedml_str = '''
           model1 = model "pdipy_oxidation"
@@ -352,13 +351,11 @@ class PDIBacterialPkg():
           plot "Oxidation proportion of prokaryotic membrane fatty acids" time vs oxidation
         '''.format(self.parameters['initial_time'], self.parameters['total_time (s)'], total_points)
         
-        # execute the model
-        tellurium_model = tellurium.loada(self.model)            
-#         tellurium_model.draw()
-#         print(tellurium_model.draw())
+        # ============== execute the model ==============
+        tellurium_model = tellurium.loada(self.model)    
         result = tellurium_model.simulate(self.parameters['initial_time'], int(self.parameters['total_time (s)']), int(total_points))
         
-        # process the data
+        # ============== process the data ==============
         self.result_df = pandas.DataFrame(result)
         self.result_df.index = self.result_df[0]
         del self.result_df[0]
@@ -381,6 +378,7 @@ class PDIBacterialPkg():
                 print(self.result_df)
             
         return self.result_df
+    
         
     def export(self, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (min)', y_label = 'proportion of total', excitation_proportion = False):
         # parse the simulation results
@@ -473,6 +471,7 @@ class PDIBacterialPkg():
                 print(variables_table)     
                 
         return processed_data
+    
 
     def define(self, bacterial_species, photosensitizer, photosensitizer_conc, light_source, irradiance = None, well_surface_area = 1, exposure = None, simulation_time = None, molecular_proportion = None):
         # parameterize the simulation
@@ -480,6 +479,7 @@ class PDIBacterialPkg():
         self.define_photosensitizer(photosensitizer_conc, photosensitizer)
         self.define_light(light_source, irradiance, well_surface_area, exposure, simulation_time)
         self.photosensitizer_proportion(molecular_proportion = None)
+        
         
     def execute(self, timestep, total_time, kinetc_constant, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'time', y_label = 'oxidation proportion'):
         self.singlet_oxygen_calculations(timestep, total_time, kinetc_constant)
