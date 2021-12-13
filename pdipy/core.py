@@ -64,34 +64,41 @@ class PDIBacterialPkg():
         self.parameters['root_path'] = os.path.dirname(__file__)
         
         
-    def define_system(self, surface_area = None, solution_volume = None, solution_depth = None, photosensitizer_mg_per_sqr_cm = None, surface_system = False, biofilm = False, individual_cell = False, medium = 'water'):
+    def define_system(self, solution_dimensions = {}, photosensitizer_mg_per_sqr_cm = None, surface_system = False, biofilm = False, individual_cell = False, medium = 'water'):
         # parameterize the photosensitizer system
         self.surface_system = surface_system
         self.biofilm = biofilm
         self.individual_cell = individual_cell
         self.parameters['medium'] = medium
+                
         if self.surface_system:
             if photosensitizer_mg_per_sqr_cm is None:
-                self.parameters['photosensitizer_mg_per_disc'] = 0.3
+                self.parameters['photosensitizer_mg_per_disc'] = 0.09
                 self.parameters['cm2_per_disc'] = (1.56/2)**2*pi
                 self.parameters['surface_area (m^2)'] = self.parameters['cm2_per_disc']*centi**2
                 photosensitizer_mg_per_sqr_cm = self.parameters['photosensitizer_mg_per_disc']/self.parameters['cm2_per_disc']
             self.parameters['photosensitizer (g/m^2)'] = photosensitizer_mg_per_sqr_cm*milli/centi**2
             
-        elif surface_area is None:
-            self.parameters['solution_volume (m^3)'] = solution_volume*micro*liter
-            self.parameters['solution_depth (m)'] = solution_depth*centi
-            self.parameters['surface_area (m^2)'] = self.parameters['solution_volume (m^3)'] / (solution_depth*centi)
-            
-        elif solution_volume is None:
-            self.parameters['solution_depth (m)'] = solution_depth*centi
-            self.parameters['surface_area (m^2)'] = surface_area*centi**2
-            self.parameters['solution_volume (m^3)'] = self.parameters['solution_depth (m)'] * self.parameters['surface_area (m^2)']
-            
-        elif solution_depth is None:
-            self.parameters['solution_volume (m^3)'] = solution_volume*centi**3
-            self.parameters['surface_area (m^2)'] = surface_area*centi**2
-            self.parameters['solution_depth (m)'] = self.parameters['solution_volume (m^3)'] / self.parameters['surface_area (m^2)']
+        else:
+            if solution_dimensions != {}:
+                solution_volume = solution_dimensions['solution_volume (m^3)']
+                surface_area = solution_dimensions['surface_area (m^2)']
+                solution_depth = solution_dimensions['solution_depth (m)']
+            else:
+                print('-> ERROR: The solution_dimensions dictionary must be populated for solution systems.')
+                
+            if solution_volume is None:
+                self.parameters['solution_depth (m)'] = solution_depth
+                self.parameters['surface_area (m^2)'] = surface_area
+                self.parameters['solution_volume (m^3)'] = self.parameters['solution_depth (m)']*self.parameters['surface_area (m^2)']
+            elif surface_area is None:
+                self.parameters['solution_volume (m^3)'] = solution_volume
+                self.parameters['solution_depth (m)'] = solution_depth
+                self.parameters['surface_area (m^2)'] = self.parameters['solution_volume (m^3)']/solution_depth
+            elif solution_depth is None:
+                self.parameters['solution_volume (m^3)'] = solution_volume
+                self.parameters['surface_area (m^2)'] = surface_area
+                self.parameters['solution_depth (m)'] = self.parameters['solution_volume (m^3)']/self.parameters['surface_area (m^2)']
             
                                         
     def define_bacterium(self, bacterial_specie):    
@@ -102,6 +109,15 @@ class PDIBacterialPkg():
         self.parameters['bacterial_specie'] = bacterial_specie
         self.bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['root_path'], bacterial_specie)))[bacterial_specie]
         self.membrane_chemicals = self.bacterium['membrane_chemicals']
+        
+        # fatty acid concentrations in the phospholipid membrane
+        self.variables['fa_g/L_conc'] = total_proportion = 0
+        for chemical in self.membrane_chemicals:
+            if re.search('FA', chemical):
+                fa_density_proportion = self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value']
+                self.variables['fa_molar'] = fa_density_proportion / average(self.membrane_chemicals[chemical]['mw'])
+                self.variables['fa_g/L_conc'] += fa_density_proportion
+                total_proportion += self.membrane_chemicals[chemical]['proportion']['value']
         
 
     def define_photosensitizer(self, photosensitizer_molar = None, photosensitizer = 'A3B_4Zn', molecular_proportion = None):
@@ -124,6 +140,8 @@ class PDIBacterialPkg():
 
         if not self.surface_system:
             self.parameters['photosensitizer_molar'] = photosensitizer_molar
+            if self.parameters['photosensitizer_molar'] is None:
+                print('-> ERROR: A molar photosensitizer concentration must be defined for systems of dissolved photosensitizers.') 
             self.variables['photosensitizers'] = (self.parameters['photosensitizer_molar']*N_A) * (self.parameters['solution_volume (m^3)']/liter)
         else:
             self.variables['photosensitizers'] = self.parameters['photosensitizer (g/m^2)'] / (self.photosensitizer['mw']['value']/N_A) * self.parameters['surface_area (m^2)']
@@ -158,15 +176,15 @@ class PDIBacterialPkg():
         # print calculated content              
         self.defined_model = True
         if self.verbose:
-            message1 = 'The tetrapyrrole is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length']))
+            message1 = 'The tetrapyrrole length is {} meters'.format(sigfigs_conversion(self.variables['center_porphyrin_length']))
             message2 = 'The benzyl extension is {} meters'.format(sigfigs_conversion(self.variables['sp2_extension']))
             message3 = 'The diazirine is {} meters'.format(sigfigs_conversion(self.variables['sp3_diazirine']))
-            message4 = 'Solution depth is not calculated for surface systems'
+            message4 = ''
             if not self.surface_system:
                 message4 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
             message5 = f'The molecular length is {sigfigs_conversion(total_length)} meters'
             message6 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
-            message7 = 'The photosensitizer volume proportion is {}'.format(sigfigs_conversion(self.variables['volume_proportion']))
+            message7 = 'The volume proportion of {} photosensitizers is {}'.format(sigfigs_conversion(self.variables['photosensitizers']), sigfigs_conversion(self.variables['volume_proportion']))
             
             messages = [message1, message2, message3, message4, message5, message6, message7, message8]
             self.messages.extend(messages)
@@ -252,20 +270,6 @@ class PDIBacterialPkg():
         # eps oxidation
         if self.biofilm:
             self.variables['eps_oxidation'] = 1e10 # empirical rate constant that represents a biofilm system from the single cellular kinetic model via a competiting oxidation reaction of EPS versus fatty acids   
-            
-            
-    def cytoplasmic_membrane(self):
-        # fatty acid concentrations in the phospholipid membrane
-        self.variables['fa_g/L_conc'] = total_proportion = 0
-        for chemical in self.membrane_chemicals:
-            if re.search('FA', chemical):
-                self.variables['fa_molar'] = self.membrane_chemicals[chemical]['density (g/L)']['value'] / average(self.membrane_chemicals[chemical]['mw']) * self.membrane_chemicals[chemical]['proportion']['value']
-                self.variables['fa_g/L_conc'] += self.membrane_chemicals[chemical]['density (g/L)']['value'] * self.membrane_chemicals[chemical]['proportion']['value']
-                total_proportion += self.membrane_chemicals[chemical]['proportion']['value']
-
-        self.variables['fa_g/L_conc'] /= total_proportion
-        self.variables['fa_molar'] /= total_proportion
-
         
     def kinetic_calculation(self): 
         # ============= define photosensitizer excitation ==============
@@ -303,26 +307,22 @@ class PDIBacterialPkg():
         
         self.variables['so_rise_time (s)'] = 2 * micro        # “Time-Resolved Investigations of Singlet Oxygen Luminescence in Water, in Phosphatidylcholine, and in Aqueous Suspensions of Phosphatidylcholine or HT29 Cells” by Baier et al., 2005
         
-        # ============== define fatty acid oxidation ==============
-        k_fa = self.variables['k_fa'] = 2.7E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
+        # ============== define fatty acid and EPS oxidation ==============
+        k_fa = self.variables['k_fa'] = 7.69E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
         fa = self.variables['fa_molar']
-        if not self.individual_cell:
-            if not self.biofilm:
-                fa /= 10**2.6
-            else:
-                fa /= 10**3
-        
-        # ============== define eps oxidation ==============
         biofilm = ''
-        if self.biofilm:
-            biofilm = 'so => o_eps + mo; {}*so'.format(self.variables['eps_oxidation'])
+        if not self.individual_cell:
+            k_fa_reduction = (self.bacterial_cfu_ml/1E6)**0.1
+            k_fa /= k_fa_reduction
+            if self.biofilm:
+                biofilm = 'so => o_eps + mo; {}*so'.format(self.variables['eps_oxidation'])            
 
         # ============== SBML kinetic model ==============
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
             ps -> e_ps; {photosensitizer}
-            e_ps => b_ps ; {k_b_ps}*e_ps
+            ps => b_ps ; {k_b_ps}*ps
             e_ps + mo -> so + ps;  {qy}*{k_so}*e_ps*mo - {k_rlx_so}*so
             so + fa => o_fa + mo; {k_fa}*so*fa
             {biofilm}
@@ -368,9 +368,12 @@ class PDIBacterialPkg():
         if self.verbose:
             message1 = tellurium_model.getCurrentAntimony()
             message2 = '\nCurrent integrator:', '\n', tellurium_model.integrator
-            self.messages.extend([message1, message2])
-            print(message1)
-            print(message2)
+            message3 = 'k_fa reduction factor:', k_fa_reduction
+
+            messages = [message1, message2, message3]
+            self.messages.extend(messages)
+            for message in messages:            
+                print(message)
             
             if self.jupyter:
                 display(self.result_df)
@@ -380,7 +383,7 @@ class PDIBacterialPkg():
         return self.result_df
     
         
-    def export(self, simulation_path = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (min)', y_label = 'proportion of total', excitation_proportion = False):
+    def export(self, simulation_path = None, simulation_name = None, figure_title = 'Oxidation proportion of prokaryotic membrane fatty acids', x_label = 'Time (min)', y_label = 'proportion of total', excitation_proportion = False):
         # parse the simulation results
         x_values = []
         oxidation_y_values = []
@@ -398,12 +401,13 @@ class PDIBacterialPkg():
         # define the simulation_path
         self.simulation_path = simulation_path
         if self.simulation_path is None:
+            if simulation_name is None:
+                simulation_name = '-'.join([re.sub(' ', '_', str(x)) for x in [date.today(), 'PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie']]])
             count = 0
-            self.simulation_path = '-'.join([re.sub(' ', '_', str(x)) for x in [date.today(), 'PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie']]])
-            while os.path.exists(self.simulation_path):
+            while os.path.exists(simulation_name):
                 count += 1
-                self.simulation_path = '-'.join([re.sub(' ', '_', str(x)) for x in [date.today(), 'PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie'], str(count)]])
-            self.simulation_path = os.path.join(os.getcwd(), self.simulation_path)        
+                simulation_name = re.sub('(-[0-9]+$)', str(count), simulation_name)
+            self.simulation_path = os.path.join(os.getcwd(), simulation_name)        
         os.mkdir(self.simulation_path)
         
         # create and export the OMEX file

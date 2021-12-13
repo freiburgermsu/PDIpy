@@ -1,0 +1,22 @@
+,variable,value
+0,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\2021-12-13-PDIpy-A3B_4Zn-Saureus-1
+1,fa_g/L_conc,0.84772
+2,fa_molar,0.0009349450174244476
+3,center_porphyrin_length,6.115819212738726e-10
+4,sp2_extension,6.102500000000001e-10
+5,sp3_diazirine,7.198734239946551e-10
+6,linked_sp3_diazirine,5.85873423994655e-10
+7,photosensitizers,120442815199999.98
+8,molecular_volume (m^3),1.1599509408023872e-27
+9,volume_proportion,6.985387840206402e-07
+10,area_proportion,2.3769466461202288e-05
+11,photon_moles_per_timestep,179.0798219276834
+12,dissolved_mo_molar,2.812605472705227e-07
+13,e_ps_decay_time (s),1.5000000000000002e-09
+14,ps_excitation (s),5e-14
+15,hv_photobleaching,0.00027021176470588235
+16,so_qy,0.48
+17,e_ps_charge_transfer (s),5.000000000000001e-07
+18,so_decay_time (s),1.03000300030003e-05
+19,so_rise_time (s),2e-06
+20,k_fa,651.8966800000001
