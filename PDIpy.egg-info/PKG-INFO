@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: PDIpy
-Version: 0.0.5
+Version: 0.0.1
 Summary: A tool for calculating cellular oxidation and death via photodynamic inactivation.
 Home-page: https://github.com/freiburgermsu/PDIpy
 Author: Andrew Freiburger

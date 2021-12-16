@@ -29,7 +29,14 @@
 			"value": 1.74e-7,
 			"reference": "“Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005",
 			"notes": "The 0.015 value from literature is divided by 8.64e4 -- the quantity of seconds in a day -- to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
-			}
+			},
+		"dimensions": {
+			"shape": "cylinder",
+			"length (A)": 33,
+			"width (A)": 33,
+			"depth (A)": 1.5,
+			"notes": "The depth is atomic thickness, as quantified by this paper https://www.nature.com/articles/ncomms1291."
+		}
 	},
 	"A3B_4Cu": {
 		"quantum_yield": {

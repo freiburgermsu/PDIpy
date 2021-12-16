@@ -1,0 +1,17 @@
+,variable,value
+0,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\surface_system-9
+1,fa_g/L_conc,0.84772
+2,fa_molar,0.0009349450174244476
+3,photosensitizers,3.665361918132831e+16
+4,molecular_volume (m^3),1.2829478999097319e-27
+5,volume_proportion,74.55432895610417
+6,photon_moles_per_timestep,0.00021128599811696939
+7,dissolved_mo_molar,2.812605472705227e-07
+8,e_ps_decay_time (s),1.5000000000000002e-09
+9,ps_excitation (s),5e-14
+10,hv_photobleaching,2.7021176470588236e-08
+11,so_qy,0.48
+12,e_ps_charge_transfer (s),5.000000000000001e-07
+13,so_decay_time (s),1.03000300030003e-05
+14,so_rise_time (s),2e-06
+15,k_fa,651.8966800000001

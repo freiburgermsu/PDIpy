@@ -1,5 +1,5 @@
 ,parameter,value
-0,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\surface_system
+0,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\surface_system-1
 1,singlet_oxygen_diffusion_distance (m),8e-08
 2,oxidation_angle,5
 3,root_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\pdipy
@@ -17,7 +17,7 @@
 15,photosensitizer_molar,101.4840153617889
 16,visible (nm),"{'upper': 7.8e-07, 'lower': 3.9e-07}"
 17,visible_proportion,0.5
-18,watts,2968.2063070424942
+18,watts,0.29682063070424947
 19,initial_time,0
 20,total_time (s),30000.0
 21,timestep (s),600.0
