@@ -5,13 +5,11 @@ from chemicals.elements import periodic_table
 from matplotlib import pyplot
 from datetime import date
 from sigfig import round
+from glob import glob
 import tellurium
 import graphviz
 import pandas
-import json
-import sys
-import re
-import os
+import json, sys, re, os
 
 pandas.set_option('max_colwidth', None)
 
@@ -29,9 +27,17 @@ def average(num_1, num_2 = None):
             return average
         else:
             return num_1
-
-# chemical dimensions in Angstroms (as the averages from https://en.wikipedia.org/wiki/Bond_length) and degrees
-
+    
+def isnumber(num):
+    try:
+        float(num)
+        return True
+    except:
+        try:
+            int(num)
+            return True
+        except:
+            return False
 
 class PDIBacterialPkg():
     def __init__(self, verbose = False, jupyter = False):
@@ -50,13 +56,22 @@ class PDIBacterialPkg():
         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = os.path.dirname(__file__)
         
+        # identify options
+        self.bacteria = [re.search('(?<=bacteria\\\\)(.+)(?=\.json)', x).group() for x in glob(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'*.json'))]
+        self.light_parameters = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'light_source.json')))
         
-    def define_system(self, solution_dimensions = {}, photosensitizer_mg_per_sqr_cm = None, surface_system = False, biofilm = False, individual_cell = False, medium = 'water'):
+    def define_system(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E6, solution_dimensions = {}, photosensitizer_mg_per_sqr_cm = None, surface_system = False, biofilm = False, individual_cell = False, medium = 'water'):
         # parameterize the photosensitizer system
         self.surface_system = surface_system
         self.biofilm = biofilm
         self.individual_cell = individual_cell
         self.parameters['medium'] = medium
+        
+        # timestep conditions
+        self.bacterial_cfu_ml = bacterial_cfu_ml
+        self.parameters['initial_time'] = initial_time
+        self.parameters['total_time (s)'] = total_time * minute
+        self.parameters['timestep (s)'] = timestep * minute
                 
         if self.surface_system:
             if photosensitizer_mg_per_sqr_cm is None:
@@ -93,9 +108,17 @@ class PDIBacterialPkg():
         self.results['biofilm_growth'] = True
         
         # load the bacterial parameters
-        self.parameters['bacterial_specie'] = bacterial_specie
-        self.bacterium = json.load(open('{}/parameters/{}.json'.format(self.parameters['root_path'], bacterial_specie)))[bacterial_specie]
-        self.membrane_chemicals = self.bacterium['membrane_chemicals']
+        if bacterial_specie in self.bacteria:
+            self.parameters['bacterial_specie'] = bacterial_specie
+            self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json')))[bacterial_specie]
+            self.membrane_chemicals = self.bacterium['membrane_chemicals']
+        elif type(bacterial_species) is dict:
+            pass
+        else:
+            error = f'--> ERROR: The {bacterial_species} bacterial specie is neither a predefined option nor is a customized dictionary.'
+            self.messages.append(error)
+            print(error)
+        
         
         # fatty acid concentrations in the phospholipid membrane
         self.variables['fa_g/L_conc'] = total_proportion = 0
@@ -137,41 +160,36 @@ class PDIBacterialPkg():
             self.variables['molecular_volume (m^3)'] = cylinder_volume(photosensitizer_length/2, photosensitizer_depth)
         molecules_volume = self.variables['photosensitizers'] * self.variables['molecular_volume (m^3)']
         self.variables['volume_proportion'] = molecules_volume / self.parameters['solution_volume (m^3)']
-
-        # calculate the layer distribution for a slice 
-        message6 = ''
-        if not self.surface_system:
-            tilted_height = total_length*float(sin(radians(45)))
-            layers = 1
-            if not self.surface_system:
-                layers = self.parameters['solution_depth (m)'] / tilted_height
-            photosensitizers_per_layer = self.variables['photosensitizers'] / layers
-            orthogonal_area = pi*(total_length)**2
-            parallel_area = (total_length)*self.parameters['atomic_thickness']
-            photosensitizers_layer_area = photosensitizers_per_layer*average(orthogonal_area, parallel_area)
-            self.variables['area_proportion'] = photosensitizers_layer_area/self.parameters['surface_area (m^2)'] 
-            message6 = 'The photosensitizer area proportion is {}'.format(sigfigs_conversion(self.variables['area_proportion']))
             
         # print calculated content
         self.defined_model = True
         if self.verbose:
+            message5 = ''
             message1 = 'The photosensitizer dimensions are {} x {} x {} m, in a {} shape.'.format(photosensitizer_length, photosensitizer_width, photosensitizer_depth, photosensitizer_shape)
             if not self.surface_system:
                 message5 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
             message3 = 'The molecular volume is {} cubic meters'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
             message4 = 'The volume proportion of {} photosensitizers is ({} m^2)/({} m^2) = {}'.format(sigfigs_conversion(self.variables['photosensitizers']), sigfigs_conversion(molecules_volume), sigfigs_conversion(self.parameters['solution_volume (m^3)']), sigfigs_conversion(self.variables['volume_proportion']))
             
-            messages = [message1, message3, message4, message6]
+            messages = [message1, message3, message4, message5]
             self.messages.extend(messages)
             for message in messages:            
                 print(message)
                 
 
-    def define_light(self, light_source, irradiance = None, exposure = None, simulation_time = None, lux = None, lumens = None, wattage = None, distance = None, reflection = False):
+    def define_light(self, light_source, irradiance = None, exposure = None, simulation_time = None, lux = None, lumens = None,):
+        # define properties of the light source
         self.parameters['visible (nm)'] = {'upper': 780 * nano, 'lower': 390 * nano}
-
-        light_parameters = json.load(open(os.path.join(self.parameters['root_path'],'parameters','light_source.json')))
-        self.parameters['visible_proportion'] = light_parameters[light_source]['visible_proportion']['value']
+        if light_source in self.light_parameters.keys(): 
+            lumens_per_watt = self.light_parameters[light_source]['lumens_per_watt']['value']
+            self.parameters['visible_proportion'] = self.light_parameters[light_source]['visible_proportion']['value']
+        elif type(light_source) is dict:
+            lumens_per_watt = light_source['lumens_per_watt']
+            self.parameters['visible_proportion'] = light_source['visible_proportion']
+        else:
+            error = f'--> ERROR: The light source {light_source} is neither a predefined option nor is a customized dictionary.'
+            self.messages.append(error)
+            print(error)
         
         # define the available light
         if irradiance is not None: # mW / cm^2
@@ -180,27 +198,21 @@ class PDIBacterialPkg():
             simulation_time = simulation_time * minute
             self.parameters['watts'] = (exposure/centi**2) / simulation_time * self.parameters['surface_area (m^2)']
         elif lux is not None: # lumen / m^2
-            self.parameters['watts'] = lux / light_parameters[light_source]['lumens_per_watt']['value'] * self.parameters['surface_area (m^2)']
+            self.parameters['watts'] = lux / lumens_per_watt * self.parameters['surface_area (m^2)']
         elif lumens is not None: # lumen
-            self.parameters['watts'] = lumens / light_parameters[light_source]['lumens_per_watt']['value']
+            self.parameters['watts'] = lumens / lumens_per_watt
         else:
             error = '--> ERROR: The light source has an unrecognized dimension.'
             self.messages.append(error)
             print(error)
 
             
-    def singlet_oxygen_calculations(self, timestep, total_time, initial_time = 0, healing_kinetics = 5, bacterial_cfu_ml = 1E6, excitation_calculation = False):
+    def singlet_oxygen_calculations(self, excitation_calculation = False):
         if not self.defined_model:
             import sys
             error = 'ERROR: The model must first be defined.'
             self.messages.append(error)
             sys.exit(error)
-            
-        # timestep conditions
-        self.bacterial_cfu_ml = bacterial_cfu_ml
-        self.parameters['initial_time'] = initial_time
-        self.parameters['total_time (s)'] = total_time * minute
-        self.parameters['timestep (s)'] = timestep * minute
             
         if 'watts' in self.parameters:                   
             # define the light watts
@@ -394,11 +406,11 @@ class PDIBacterialPkg():
         self.result_df.to_csv(os.path.join(self.simulation_path, 'raw_data.csv'))
         
         # export the processed data
-        processed_data = pandas.DataFrame(list(processed_data_dictionary.items()), columns = ['time (hr)','oxidation_proportion'])
-        processed_data.index = processed_data['time (hr)']
-        del processed_data['time (hr)']
-        processed_path = os.path.join(self.simulation_path, 'processed_data.csv')
-        processed_data.to_csv(processed_path)
+        self.processed_data = pandas.DataFrame(list(processed_data_dictionary.items()), columns = ['time (hr)','oxidation_proportion'])
+        self.processed_data.index = self.processed_data['time (hr)']
+        del self.processed_data['time (hr)']
+        self.processed_path = os.path.join(self.simulation_path, 'processed_data.csv')
+        self.processed_data.to_csv(self.processed_path)
         
         # export the figure
         figure_path = os.path.join(self.simulation_path, 'output.svg')
@@ -451,7 +463,7 @@ class PDIBacterialPkg():
             else:
                 print(variables_table)     
                 
-        return processed_data
+        return self.processed_data
     
 
     def define(self, bacterial_species, photosensitizer, photosensitizer_conc, light_source, irradiance = None, well_surface_area = 1, exposure = None, simulation_time = None, molecular_proportion = None):
@@ -467,5 +479,35 @@ class PDIBacterialPkg():
         self.geometric_oxidation()
         raw_data = self.kinetic_calculation()
         self.export(simulation_path, figure_title, x_label, y_label, )
+        
+        
+    def data_processing(self, target_reduction = None, target_time = None):
+        if isnumber(target_reduction):
+            if target_reduction > self.processed_data.iat[-1,0]:
+                message = '--> ERROR: The inquired reduction is never reached.'
+            else:
+                for index, point in self.processed_data.iterrows():
+                    if point['oxidation_proportion'] >= target_reduction:
+                        quantity = index
+                        unit = 'hour'
+                        message = f'time to target ({unit}): {quantity}'
+                        break
+                    
+        elif isnumber(target_time):
+            if target_time > self.processed_data.index[-1]:
+                message = '--> ERROR: The inquired time is never reached.'
+            else:
+                for index, point in self.processed_data.iterrows():
+                    if index >= target_time:
+                        quantity = point['oxidation_proportion']*100
+                        unit = '%'
+                        message = f'reduction at target ({unit}): {quantity}'
+                        break
+        else:
+            message = '--> ERROR: Neither the target_time nor the target_reduction are parameterized as numbers.'
+            quantity = None
             
-        return raw_data
+        print(message)
+        self.messages.append(message)
+                
+        return quantity, unit
