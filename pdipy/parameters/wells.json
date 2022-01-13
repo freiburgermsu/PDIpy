@@ -1,0 +1,27 @@
+{
+	"6": {
+		"area (cm^2)": 9.60,
+		"depth (cm)": 1.771,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+	},
+	"12": {
+		"area (cm^2)": 3.85,
+		"depth (cm)": 1.766,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+	},
+	"24": {
+		"area (cm^2)": 1.93,
+		"depth (cm)": 1.81,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+	},
+	"48": {
+		"area (cm^2)": 0.84,
+		"depth (cm)": 1.845,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+	},
+	"96": {
+		"area (cm^2)": 0.33,
+		"depth (cm)": 1.182,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+	}
+}

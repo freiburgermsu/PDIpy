@@ -31,9 +31,9 @@
 			"notes": "The 0.015 value from literature is divided by 8.64e4 -- the quantity of seconds in a day -- to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
 			},
 		"dimensions": {
-			"shape": "cylinder",
-			"length (A)": 33,
-			"width (A)": 33,
+			"shape": "disc",
+			"length (A)": 32.8,
+			"width (A)": 32.8,
 			"depth (A)": 1.5,
 			"notes": "The depth is atomic thickness, as quantified by this paper https://www.nature.com/articles/ncomms1291."
 		}
