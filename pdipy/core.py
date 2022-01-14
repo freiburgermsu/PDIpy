@@ -293,7 +293,8 @@ class PDIBacterialPkg():
         if self.biofilm:
             self.variables['eps_oxidation'] = 1e10 # empirical rate constant that represents a biofilm system from the single cellular kinetic model via a competiting oxidation reaction of EPS versus fatty acids   
         
-    def kinetic_calculation(self, calculate_excited_photosensitizer_conc = False): 
+    def kinetic_calculation(self, calculate_excited_photosensitizer_conc = False, percent_oxidation_threshold = 8):
+        self.parameters['percent_oxidation_threshold'] = percent_oxidation_threshold
         # ============= define photosensitizer excitation ==============
         ps = self.variables['photosensitizer_molar']
         if not calculate_excited_photosensitizer_conc:
@@ -416,23 +417,35 @@ class PDIBacterialPkg():
         return self.result_df
     
         
-    def export(self, simulation_name = None, simulation_path = None, exposure_axis = False, figure_title = None, x_label = 'Time (min)', y_label = 'proportion of total', display_excitation_proportion = False):
+    def export(self, simulation_name = None, simulation_path = None, exposure_axis = False, figure_title = None, x_label = 'Time (min)', y_label = 'proportion of total', fa_oxidation_proportion = True, display_excitation_proportion = False):
         # parse the simulation results
         x_values = []
         oxidation_y_values = []
+        reduction_y_values = []
         excitation_y_values = []
-        processed_data_dictionary = {}
+        oxidations = []
+        reductions = []
+        indices = []
         for index, point in self.result_df.iterrows():      # cytoplasmic oxidation may not be 1:1 correlated with reduction
             x_value = index/minute
             if exposure_axis:
                 x_value *= (self.parameters['watts']*minute/self.parameters['surface_area (m^2)'])
             x_values.append(x_value) # sigfigs_conversion(index))
+            indices.append(index/hour)
+            
+            # calculate the oxidation_proportion of the cytoplasmic fatty acids
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_y_values.append(oxidation_proportion)
-            processed_data_dictionary[index/hour] = oxidation_proportion
+            oxidations.append(oxidation_proportion)
             
+            # calculate the percent_reduction of the bacteria
+            percent_reduction = oxidation_proportion * (100/self.parameters['percent_oxidation_threshold'])
+            reduction_y_values.append(percent_reduction)
+            reductions.append(percent_reduction)
+            
+            # calculate the excitation_proportion of the photosensitizers
             excitation_proportion = point['[e_ps]'] / (point['[ps]']+point['[e_ps]']+point['[b_ps]']) 
-            excitation_y_values.append(excitation_proportion)
+            excitation_y_values.append(excitation_proportion)            
         
         # define the simulation_path
         if simulation_path is None:
@@ -463,9 +476,11 @@ class PDIBacterialPkg():
         self.result_df.to_csv(os.path.join(simulation_path, 'raw_data.csv'))
         
         # export the processed data
-        self.processed_data = pandas.DataFrame(list(processed_data_dictionary.items()), columns = ['time (hr)','oxidation_proportion'])
-        self.processed_data.index = self.processed_data['time (hr)']
-        del self.processed_data['time (hr)']
+        self.processed_data = pandas.DataFrame(index = indices)
+        self.processed_data.index.name = 'time (hr)'
+        self.processed_data['oxidation_proportion'] = oxidations
+        self.processed_data['percent_reduction'] = reductions
+        display(self.processed_data)
         self.processed_data.to_csv(os.path.join(simulation_path, 'processed_data.csv'))
         
         # export the figure
@@ -473,7 +488,9 @@ class PDIBacterialPkg():
         pyplot.rcParams['figure.figsize'] = (11, 7)
         pyplot.rcParams['figure.dpi'] = 150
         figure, ax = pyplot.subplots()
-        ax.plot(x_values, oxidation_y_values, label = 'Fatty acid oxidation')
+        ax.plot(x_values, reduction_y_values, label = 'Reduction proportion')
+        if fa_oxidation_proportion:
+            ax.plot(x_values, oxidation_y_values, label = 'Fatty acid oxidation')
         if display_excitation_proportion:
             ax.plot(x_values, excitation_y_values, label = 'Photosensitizer excitation')
         if exposure_axis:
@@ -481,7 +498,7 @@ class PDIBacterialPkg():
         ax.set_ylabel(y_label)
         ax.set_xlabel(x_label)
         if figure_title is None:
-            figure_title = 'Oxidation proportion of {} cytoplasm'.format(self.parameters['bacterial_specie'])
+            figure_title = 'PDI oxidation of the {} cytoplasm'.format(self.parameters['bacterial_specie'])
         ax.set_title(figure_title)
         ax.legend()
         figure.savefig(figure_path)
