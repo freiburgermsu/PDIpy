@@ -428,7 +428,7 @@ class PDIBacterialPkg():
                     inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
                     top_increment += top_increment_change
                     count += 1
-            return count
+            return count, inactivation_y_values, top_increment
                     
         # parse the simulation results
         x_values = []
@@ -451,48 +451,51 @@ class PDIBacterialPkg():
         # determine the regression equation for the fitted curve via the Hill equation
         xs = x_values[1:]
         ys = oxidation_y_values[1:]
-        hf = HillFit(xs, ys)
-        fitted_xs, fitted_ys, eq_params, fitted_equation = hf.fitting(x_label = 'time (hr)', y_label = 'oxidation proportion', view_figure = False)
+        self.hf = HillFit(xs, ys)
+        fitted_xs, fitted_ys, eq_params, fitted_equation = self.hf.fitting(x_label = 'time (hr)', y_label = 'oxidation proportion', view_figure = False)
+        
+        # define and refine the fitted Hill equation parameters
         top = eq_params[0]
         bottom = eq_params[1]
         ec50 = eq_params[2]
-        nH = eq_params[3]            
-            
-        # refine the top_increment
+        nH = eq_params[3]
         top_increment = 0.01*top
         ec50_change = -.76*ec50
         nH_change = 1.24*nH
         
         inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
         count = 0
-        increments = [0.01*top, -0.0001*top, 0.00001*top, -0.000001*top, 0.00000001*top]
+        increments = [0.01*top, -0.00001*top, 0.000001*top, -0.0000001*top, 0.00000001*top]
         relative_to_1 = 'greater'
         print('The raw oxidation data is being converting into a bacterial inactivation predictions. This may take a minute.')
         for top_increment_change in increments:
-            count = approach_1(inactivation_y_values, top_increment, top_increment_change, count, relative_to_1)
+            count, inactivation_y_values, top_increment = approach_1(inactivation_y_values, top_increment, top_increment_change, count, relative_to_1)
+            print('refinement loop: ', count)
             if relative_to_1 == 'greater':
                 relative_to_1 = 'lesser'
             else:
                 relative_to_1 = 'greater'
                 
         # create the DataFrame of processed data
-        self.processed_data = pandas.DataFrame(index = x_values)
+        oxidations = oxidation_y_values[1:]
+        excitations = excitation_y_values[1:]
+        self.processed_data = pandas.DataFrame(index = xs)
         index_label = 'time (hr)'
         if exposure_axis:
             index_label = 'exposure (J/cm\N{superscript two})'
         self.processed_data.index.name = index_label
-        self.processed_data['oxidation'] = oxidation_y_values
+        self.processed_data['oxidation'] = oxidations
         self.processed_data['inactivation'] = inactivation_y_values
         
         # create the data figure
         pyplot.rcParams['figure.figsize'] = (11, 7)
         pyplot.rcParams['figure.dpi'] = 150
         self.figure, ax = pyplot.subplots()
-        ax.plot(x_values, inactivation_y_values, label = 'Inactivation')
+        ax.plot(xs, inactivation_y_values, label = 'Inactivation')
         if fa_oxidation_proportion:
-            ax.plot(x_values, oxidation_y_values, label = 'Oxidation')
+            ax.plot(xs, oxidations, label = 'Oxidation')
         if display_excitation_proportion:
-            ax.plot(x_values, excitation_y_values, label = 'PS Excitation')
+            ax.plot(xs, excitation_y_values, label = 'PS Excitation')
         ax.set_ylabel(y_label)
         ax.set_xlabel(index_label)
         if figure_title is None:
@@ -526,7 +529,7 @@ class PDIBacterialPkg():
             if not re.search('(-[0-9]+$)', export_path):
                 export_path += f'-{count}'   
             else:
-                export_path = re.sub('([0-9]+)$', str(count), simulation_name)
+                export_path = re.sub('([0-9]+)$', str(count), export_name)
             count += 1
 
         os.mkdir(export_path)
@@ -534,12 +537,12 @@ class PDIBacterialPkg():
         # create and export the OMEX file
         inline_omex = '\n'.join([self.model, self.phrasedml_str])  
         omex_file_name = 'input.omex'
-        tellurium.exportInlineOmex(inline_omex, os.path.join(simulation_path, omex_file_name))
+        tellurium.exportInlineOmex(inline_omex, os.path.join(export_path, omex_file_name))
         self.result_df.to_csv(os.path.join(export_path, 'raw_data.csv'))
         
         # export the processed data and the regression content
         self.processed_data.to_csv(os.path.join(export_path, 'processed_data.csv'))
-        hf.export(export_path)
+        self.hf.export(export_path)
         
         # export the figure
         self.figure.savefig(os.path.join(export_path, 'inactivation.svg'))
