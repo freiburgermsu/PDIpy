@@ -1,8 +1,8 @@
-# import libraries
 from scipy.constants import femto, pico, angstrom, nano, micro, milli, centi, kilo, liter, N_A, h, c, minute, hour
 from math import pow, pi, sin, cos, radians, ceil, log
 from chemicals.elements import periodic_table
 from matplotlib import pyplot
+from hillfit import HillFit
 from datetime import date
 from pprint import pprint
 from sigfig import round
@@ -203,8 +203,8 @@ class PDIBacterialPkg():
             message1 = 'The photosensitizer dimensions as a {} = {} m x {} m x {} m.'.format(photosensitizer_shape, photosensitizer_length, photosensitizer_width, photosensitizer_depth)
 #             if not self.surface_system:
 #                 message2 = 'The {} m deep solution was divided into {} layers'.format(self.parameters['solution_depth (m)'], ceil(layers))
-            message3 = 'Photosensitizer volume = {} m^3'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
-            message4 = 'The volume proportion of {} photosensitizers = ({} m^3 of photosensitizer)/({} m^3 of solution) = {}'.format(sigfigs_conversion(self.variables['photosensitizers']), sigfigs_conversion(molecules_volume), sigfigs_conversion(self.parameters['solution_volume (m^3)']), sigfigs_conversion(self.variables['volume_proportion']))
+            message3 = 'Photosensitizer volume = {} m\N{superscript three}'.format(sigfigs_conversion(self.variables['molecular_volume (m^3)']))
+            message4 = 'The volume proportion of {} photosensitizers = ({} m\N{superscript three} of photosensitizer)/({} m\N{superscript three} of solution) = {}'.format(sigfigs_conversion(self.variables['photosensitizers']), sigfigs_conversion(molecules_volume), sigfigs_conversion(self.parameters['solution_volume (m^3)']), sigfigs_conversion(self.variables['volume_proportion']))
             
             messages = [message1, message3, message4, message2]
             self.messages.extend(messages)
@@ -375,7 +375,7 @@ class PDIBacterialPkg():
             
           end
         ''')       
-        # ============== model SED-ML plot ==============
+        # ============== SED-ML plot ==============
         total_points = int(self.parameters['total_time (s)'] / self.parameters['timestep (s)'])
         self.phrasedml_str = '''
           model1 = model "pdipy_oxidation"
@@ -416,148 +416,187 @@ class PDIBacterialPkg():
             
         return self.result_df
     
-        
-    def export(self, simulation_name = None, simulation_path = None, exposure_axis = False, figure_title = None, x_label = 'Time (min)', y_label = 'proportion of total', fa_oxidation_proportion = True, display_excitation_proportion = False):
+    def data_processing(self, exposure_axis = False, figure_title = None, y_label = 'proportion of total', fa_oxidation_proportion = True, display_excitation_proportion = False):
+        def approach_1(inactivation_y_values, top_increment, top_increment_change, count, relative_to_1 = 'greater'):
+            if relative_to_1 == 'greater':
+                while inactivation_y_values[-1] > 1:
+                    inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
+                    top_increment += top_increment_change
+                    count += 1
+            elif relative_to_1 == 'lesser':
+                while inactivation_y_values[-1] < 1:
+                    inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
+                    top_increment += top_increment_change
+                    count += 1
+            return count
+                    
         # parse the simulation results
         x_values = []
         oxidation_y_values = []
-        reduction_y_values = []
         excitation_y_values = []
-        oxidations = []
-        reductions = []
-        indices = []
         for index, point in self.result_df.iterrows():      # cytoplasmic oxidation may not be 1:1 correlated with reduction
-            x_value = index/minute
+            x_value = index/hour
             if exposure_axis:
-                x_value *= (self.parameters['watts']*minute/self.parameters['surface_area (m^2)'])
+                x_value *= (self.parameters['watts']*hour/self.parameters['surface_area (m^2)'])
             x_values.append(x_value) # sigfigs_conversion(index))
-            indices.append(index/hour)
             
             # calculate the oxidation_proportion of the cytoplasmic fatty acids
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_y_values.append(oxidation_proportion)
-            oxidations.append(oxidation_proportion)
-            
-            # calculate the percent_reduction of the bacteria
-            percent_reduction = oxidation_proportion * (100/self.parameters['percent_oxidation_threshold'])
-            reduction_y_values.append(percent_reduction)
-            reductions.append(percent_reduction)
             
             # calculate the excitation_proportion of the photosensitizers
             excitation_proportion = point['[e_ps]'] / (point['[ps]']+point['[e_ps]']+point['[b_ps]']) 
-            excitation_y_values.append(excitation_proportion)            
+            excitation_y_values.append(excitation_proportion)  
+
+        # determine the regression equation for the fitted curve via the Hill equation
+        xs = x_values[1:]
+        ys = oxidation_y_values[1:]
+        hf = HillFit(xs, ys)
+        fitted_xs, fitted_ys, eq_params, fitted_equation = hf.fitting(x_label = 'time (hr)', y_label = 'oxidation proportion', view_figure = False)
+        top = eq_params[0]
+        bottom = eq_params[1]
+        ec50 = eq_params[2]
+        nH = eq_params[3]            
+            
+        # refine the top_increment
+        top_increment = 0.01*top
+        ec50_change = -.76*ec50
+        nH_change = 1.24*nH
         
+        inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
+        count = 0
+        increments = [0.01*top, -0.0001*top, 0.00001*top, -0.000001*top, 0.00000001*top]
+        relative_to_1 = 'greater'
+        print('The raw oxidation data is being converting into a bacterial inactivation predictions. This may take a minute.')
+        for top_increment_change in increments:
+            count = approach_1(inactivation_y_values, top_increment, top_increment_change, count, relative_to_1)
+            if relative_to_1 == 'greater':
+                relative_to_1 = 'lesser'
+            else:
+                relative_to_1 = 'greater'
+                
+        # create the DataFrame of processed data
+        self.processed_data = pandas.DataFrame(index = x_values)
+        index_label = 'time (hr)'
+        if exposure_axis:
+            index_label = 'exposure (J/cm\N{superscript two})'
+        self.processed_data.index.name = index_label
+        self.processed_data['oxidation'] = oxidation_y_values
+        self.processed_data['inactivation'] = inactivation_y_values
+        
+        # create the data figure
+        pyplot.rcParams['figure.figsize'] = (11, 7)
+        pyplot.rcParams['figure.dpi'] = 150
+        self.figure, ax = pyplot.subplots()
+        ax.plot(x_values, inactivation_y_values, label = 'Inactivation')
+        if fa_oxidation_proportion:
+            ax.plot(x_values, oxidation_y_values, label = 'Oxidation')
+        if display_excitation_proportion:
+            ax.plot(x_values, excitation_y_values, label = 'PS Excitation')
+        ax.set_ylabel(y_label)
+        ax.set_xlabel(index_label)
+        if figure_title is None:
+            figure_title = 'Cytoplasmic oxidation and inactivation of {} via PDI'.format(self.parameters['bacterial_specie'])
+        ax.set_title(figure_title)
+        ax.legend()
+        
+        if self.verbose:
+            message = f'The oxidation data was distilled into inactivation data in {count} loops'
+            print(message)
+            self.messages.append(message)
+            
+        return self.processed_data
+    
+        
+    def export(self, export_name = None, export_directory = None):       
         # define the simulation_path
-        if simulation_path is None:
-            if simulation_name is None:
-                simulation_name = '-'.join([re.sub(' ', '_', str(x)) for x in [date.today(), 'PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie']]])
-            count = 0
-            while os.path.exists(simulation_name):
-                count += 1
-                simulation_name = re.sub('([0-9]+)$', str(count), simulation_name)
-                if not re.search('(-[0-9]+$)', simulation_name):
-                    simulation_name += f'-{count}'
-            simulation_path = os.path.join(os.getcwd(), simulation_name)        
-            os.mkdir(simulation_path)
-        else:
-            count = 0
-            while os.path.exists(simulation_path):
-                if not re.search('-[0-9]+\..+', simulation_path):
-                    simulation_path = re.sub('(\..+)', f'-{count}\..+', simulation_path)
-                else:
-                    simulation_path = re.sub('-[0-9]+', f'-{count}\..+', simulation_path)
-                count += 1
-            os.mkdir(simulation_path)
-        
+        if export_directory is None:
+            export_directory = os.getcwd()
+        elif not os.path.exists(export_directory):
+            error = '--> ERROR: The provided directory does not exist'
+            print(error)
+            self.messages.append(error)
+
+        if export_name is None:
+            export_name = '-'.join([re.sub(' ', '_', str(x)) for x in [date.today(), 'PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie']]])
+            
+        count = 0
+        export_path = os.path.join(export_directory, export_name)
+        while os.path.exists(export_path):
+            if not re.search('(-[0-9]+$)', export_path):
+                export_path += f'-{count}'   
+            else:
+                export_path = re.sub('([0-9]+)$', str(count), simulation_name)
+            count += 1
+
+        os.mkdir(export_path)
+            
         # create and export the OMEX file
         inline_omex = '\n'.join([self.model, self.phrasedml_str])  
         omex_file_name = 'input.omex'
         tellurium.exportInlineOmex(inline_omex, os.path.join(simulation_path, omex_file_name))
-        self.result_df.to_csv(os.path.join(simulation_path, 'raw_data.csv'))
+        self.result_df.to_csv(os.path.join(export_path, 'raw_data.csv'))
         
-        # export the processed data
-        self.processed_data = pandas.DataFrame(index = indices)
-        self.processed_data.index.name = 'time (hr)'
-        self.processed_data['oxidation_proportion'] = oxidations
-        self.processed_data['percent_reduction'] = reductions
-        display(self.processed_data)
-        self.processed_data.to_csv(os.path.join(simulation_path, 'processed_data.csv'))
+        # export the processed data and the regression content
+        self.processed_data.to_csv(os.path.join(export_path, 'processed_data.csv'))
+        hf.export(export_path)
         
         # export the figure
-        figure_path = os.path.join(simulation_path, 'output.svg')
-        pyplot.rcParams['figure.figsize'] = (11, 7)
-        pyplot.rcParams['figure.dpi'] = 150
-        figure, ax = pyplot.subplots()
-        ax.plot(x_values, reduction_y_values, label = 'Reduction proportion')
-        if fa_oxidation_proportion:
-            ax.plot(x_values, oxidation_y_values, label = 'Fatty acid oxidation')
-        if display_excitation_proportion:
-            ax.plot(x_values, excitation_y_values, label = 'Photosensitizer excitation')
-        if exposure_axis:
-            x_label = 'exposure (J/m^2)'
-        ax.set_ylabel(y_label)
-        ax.set_xlabel(x_label)
-        if figure_title is None:
-            figure_title = 'PDI oxidation of the {} cytoplasm'.format(self.parameters['bacterial_specie'])
-        ax.set_title(figure_title)
-        ax.legend()
-        figure.savefig(figure_path)
+        self.figure.savefig(os.path.join(export_path, 'inactivation.svg'))
         if self.verbose:
             if not self.jupyter:
-                figure.show()
+                self.figure.show()
         
-        # define a table of parameters
+        # define and export a table of parameters
         parameters = {'parameter':[], 'value':[]}
         parameters['parameter'].append('simulation_path')
-        parameters['value'].append(simulation_path)
+        parameters['value'].append(export_path)
         for parameter, value in self.parameters.items():
             parameters['parameter'].append(parameter)
             if isnumber(value):
                 parameters['value'].append(sigfigs_conversion(value, 5))
             else:
-                parameters['value'].append(value)            
+                parameters['value'].append(value)      
+                
         parameters_table = pandas.DataFrame(parameters)
-        parameters_path = os.path.join(simulation_path, 'parameters.csv')
-        parameters_table.to_csv(parameters_path)
+        parameters_table.to_csv(os.path.join(export_path, 'parameters.csv'))
         if self.verbose:
             if self.jupyter:
                 display(parameters_table)
             else:
                 print(parameters_table)
         
-        # define a table of variables
+        # define and export a table of variables
         variables = {'variable':[], 'value':[]}
         variables['variable'].append('simulation_path')
-        variables['value'].append(simulation_path)
+        variables['value'].append(export_path)
         for variable, value in self.variables.items():
             variables['variable'].append(variable)
             if isnumber(value):
                 variables['value'].append(sigfigs_conversion(value, 5))
             else:
                 variables['value'].append(value)
-        variables_table = pandas.DataFrame(variables)        
-        variables_path = os.path.join(simulation_path, 'variables.csv')
-        variables_table.to_csv(variables_path)
+                
+        variables_table = pandas.DataFrame(variables)   
+        variables_table.to_csv(os.path.join(export_path, 'variables.csv'))
         if self.verbose:
             if self.jupyter:
                 display(variables_table)
             else:
                 print(variables_table)     
-                
-        return self.processed_data
         
         
-    def data_processing(self, target_reduction = None, target_time = None):
+    def data_parsing(self, target_reduction = None, target_time = None):
         quantity = unit = None
         if isnumber(target_reduction):
-            if target_reduction > self.processed_data.iat[-1,0]:
+            if target_reduction > self.processed_data['inactivation'].iloc[-1]:
                 message = '--> ERROR: The inquired reduction is never reached.'
             else:
                 for index, point in self.processed_data.iterrows():
-                    if point['oxidation_proportion'] >= target_reduction:
-                        quantity = index
-                        unit = 'hour'
-                        message = f'time to target ({unit}): {quantity}'
+                    if point['inactivation'] >= target_reduction:
+                        message = f'hours to target: {index}'
+                        print(message)
+                        self.messages.append(message)
                         break
         elif isnumber(target_time):
             if target_time > self.processed_data.index[-1]:
@@ -565,9 +604,9 @@ class PDIBacterialPkg():
             else:
                 for index, point in self.processed_data.iterrows():
                     if index >= target_time:
-                        quantity = point['oxidation_proportion']*100
-                        unit = '%'
-                        message = f'reduction at target ({unit}): {quantity}'
+                        message = '%-inactivation at {}: {}'.format(target_time, point['inactivation']*100)
+                        print(message)
+                        self.messages.append(message)
                         break
         else:
             message = '--> ERROR: Neither the target_time nor the target_reduction are parameterized as numbers.'
