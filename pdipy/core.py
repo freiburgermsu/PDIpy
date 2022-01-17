@@ -6,6 +6,7 @@ from hillfit import HillFit
 from datetime import date
 from pprint import pprint
 from sigfig import round
+from numpy import array
 from glob import glob
 import tellurium
 import graphviz
@@ -63,7 +64,7 @@ class PDIBacterialPkg():
         self.light_parameters = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'light_source.json')))
         self.photosensitizers = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'photosensitizers.json'), encoding = 'utf-8'))
         
-    def define_system(self, timestep, total_time, initial_time = 0, bacterial_cfu_ml = 1E6, solution_dimensions = {}, photosensitizer_mg_per_disc = 0.09, cm2_per_disc = 1.91134, surface_system = False, biofilm = False, well_count = '24', individual_cell = False, medium = 'water'):
+    def define_system(self, total_time, initial_time = 0, bacterial_cfu_ml = 1E6, solution_dimensions = {}, photosensitizer_mg_per_disc = 0.09, cm2_per_disc = 1.91134, surface_system = False, biofilm = False, well_count = '24', timestep = 3, individual_cell = False, medium = 'water'):
         # parameterize the photosensitizer system
         self.surface_system = surface_system
         self.biofilm = biofilm
@@ -291,7 +292,7 @@ class PDIBacterialPkg():
         
         # eps oxidation
         if self.biofilm:
-            self.variables['eps_oxidation'] = 1e10 # empirical rate constant that represents a biofilm system from the single cellular kinetic model via a competiting oxidation reaction of EPS versus fatty acids   
+            self.variables['eps_oxidation'] = self.bacterium['eps_oxidation_rate_constant']
         
     def kinetic_calculation(self, calculate_excited_photosensitizer_conc = False, percent_oxidation_threshold = 8):
         self.parameters['percent_oxidation_threshold'] = percent_oxidation_threshold
@@ -389,15 +390,15 @@ class PDIBacterialPkg():
         result = tellurium_model.simulate(self.parameters['initial_time'], self.parameters['total_time (s)'], total_points)
         
         # ============== process the data ==============
-        self.result_df = pandas.DataFrame(result)
-        self.result_df.index = self.result_df[0]
-        del self.result_df[0]
-        self.result_df.index.name = 'Time (s)'
+        self.raw_data = pandas.DataFrame(result)
+        self.raw_data.index = self.raw_data[0]
+        del self.raw_data[0]
+        self.raw_data.index.name = 'Time (s)'
         
         if self.biofilm:
-            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]', '[oeps]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]', '[oeps]']
         else:
-            self.result_df.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
         
         if self.verbose:
             message1 = tellurium_model.getCurrentAntimony()
@@ -410,22 +411,20 @@ class PDIBacterialPkg():
                 print(message)
             
             if self.jupyter:
-                display(self.result_df)
+                display(self.raw_data)
             else:
-                print(self.result_df)
-            
-        return self.result_df
+                print(self.raw_data)
     
     def data_processing(self, exposure_axis = False, figure_title = None, y_label = 'proportion of total', fa_oxidation_proportion = True, display_excitation_proportion = False):
-        def approach_1(inactivation_y_values, top_increment, top_increment_change, count, relative_to_1 = 'greater'):
+        def approach_1(xs, inactivation_y_values, top_increment, top_increment_change, count, relative_to_1 = 'greater'):
             if relative_to_1 == 'greater':
                 while inactivation_y_values[-1] > 1:
-                    inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
+                    inactivation_y_values = list(eval(f'{bottom} + ({top}-{top_increment}-{bottom})*xs**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + xs**({nH}+{nH_change}))'))
                     top_increment += top_increment_change
                     count += 1
             elif relative_to_1 == 'lesser':
                 while inactivation_y_values[-1] < 1:
-                    inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
+                    inactivation_y_values = list(eval(f'{bottom} + ({top}-{top_increment}-{bottom})*xs**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + xs**({nH}+{nH_change}))'))
                     top_increment += top_increment_change
                     count += 1
             return count, inactivation_y_values, top_increment
@@ -434,7 +433,11 @@ class PDIBacterialPkg():
         x_values = []
         oxidation_y_values = []
         excitation_y_values = []
-        for index, point in self.result_df.iterrows():      # cytoplasmic oxidation may not be 1:1 correlated with reduction
+        first = True
+        for index, point in self.raw_data.iterrows():      # cytoplasmic oxidation may not be 1:1 correlated with reduction
+            if first:   # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
+                first = False
+                continue
             x_value = index/hour
             if exposure_axis:
                 x_value *= (self.parameters['watts']*hour/self.parameters['surface_area (m^2)'])
@@ -449,42 +452,48 @@ class PDIBacterialPkg():
             excitation_y_values.append(excitation_proportion)  
 
         # determine the regression equation for the fitted curve via the Hill equation
-        xs = x_values[1:]
-        ys = oxidation_y_values[1:]
-        self.hf = HillFit(xs, ys)
-        fitted_xs, fitted_ys, eq_params, fitted_equation = self.hf.fitting(x_label = 'time (hr)', y_label = 'oxidation proportion', view_figure = False)
-        
-        # define and refine the fitted Hill equation parameters
-        top = eq_params[0]
-        bottom = eq_params[1]
-        ec50 = eq_params[2]
-        nH = eq_params[3]
-        top_increment = 0.01*top
-        ec50_change = -.76*ec50
-        nH_change = 1.24*nH
-        
-        inactivation_y_values = [eval(f'{bottom} + ({top}-{top_increment}-{bottom})*x**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + x**({nH}+{nH_change}))') for x in x_values if x != 0]
-        count = 0
-        increments = [0.01*top, -0.00001*top, 0.000001*top, -0.0000001*top, 0.00000001*top]
-        relative_to_1 = 'greater'
-        print('The raw oxidation data is being converting into a bacterial inactivation predictions. This may take a minute.')
-        for top_increment_change in increments:
-            count, inactivation_y_values, top_increment = approach_1(inactivation_y_values, top_increment, top_increment_change, count, relative_to_1)
-            print('refinement loop: ', count)
-            if relative_to_1 == 'greater':
-                relative_to_1 = 'lesser'
-            else:
-                relative_to_1 = 'greater'
+        xs = array(x_values)
+        ys = array(oxidation_y_values)
+        if not self.biofilm:
+            self.hf = HillFit(xs, ys)
+            self.hf.fitting(x_label = 'time (hr)', y_label = 'oxidation proportion', view_figure = False)
+
+            # define and refine the fitted Hill equation parameters
+            top = self.hf.top
+            bottom = self.hf.bottom
+            ec50 = self.hf.ec50
+            nH = self.hf.nH
+            top_increment = 0.01*top
+            ec50_change = -.76*ec50
+            nH_change = 1.24*nH
+
+            inactivation_y_values = list(eval(f'{bottom} + ({top}-{top_increment}-{bottom})*xs**({nH}+{nH_change}) / (({ec50}+{ec50_change})**({nH}+{nH_change}) + xs**({nH}+{nH_change}))'))
+            count = 0
+            increments = [0.01*top, -0.00001*top, 0.000001*top, -0.0000001*top, 0.00000001*top]
+            relative_to_1 = 'greater'
+            for top_increment_change in increments:
+                count, inactivation_y_values, top_increment = approach_1(xs, inactivation_y_values, top_increment, top_increment_change, count, relative_to_1)
+                print('refinement loop: ', count)
+                if relative_to_1 == 'greater':
+                    relative_to_1 = 'lesser'
+                else:
+                    relative_to_1 = 'greater'
+                    
+            if self.verbose:
+                message = f'The oxidation data was distilled into inactivation data in {count} loops'
+                print(message)
+                self.messages.append(message)
                 
-        # create the DataFrame of processed data
-        oxidations = oxidation_y_values[1:]
-        excitations = excitation_y_values[1:]
-        self.processed_data = pandas.DataFrame(index = xs)
+        else:
+            inactivation_y_values = oxidation_y_values
+                
+        # create the DataFrame of processed data        
+        self.processed_data = pandas.DataFrame(index = list(xs))
         index_label = 'time (hr)'
         if exposure_axis:
             index_label = 'exposure (J/cm\N{superscript two})'
         self.processed_data.index.name = index_label
-        self.processed_data['oxidation'] = oxidations
+        self.processed_data['oxidation'] = oxidation_y_values
         self.processed_data['inactivation'] = inactivation_y_values
         
         # create the data figure
@@ -493,7 +502,7 @@ class PDIBacterialPkg():
         self.figure, ax = pyplot.subplots()
         ax.plot(xs, inactivation_y_values, label = 'Inactivation')
         if fa_oxidation_proportion:
-            ax.plot(xs, oxidations, label = 'Oxidation')
+            ax.plot(xs, oxidation_y_values, label = 'Oxidation')
         if display_excitation_proportion:
             ax.plot(xs, excitation_y_values, label = 'PS Excitation')
         ax.set_ylabel(y_label)
@@ -501,15 +510,7 @@ class PDIBacterialPkg():
         if figure_title is None:
             figure_title = 'Cytoplasmic oxidation and inactivation of {} via PDI'.format(self.parameters['bacterial_specie'])
         ax.set_title(figure_title)
-        ax.legend()
-        
-        if self.verbose:
-            message = f'The oxidation data was distilled into inactivation data in {count} loops'
-            print(message)
-            self.messages.append(message)
-            
-        return self.processed_data
-    
+        ax.legend()    
         
     def export(self, export_name = None, export_directory = None):       
         # define the simulation_path
@@ -531,18 +532,19 @@ class PDIBacterialPkg():
             else:
                 export_path = re.sub('([0-9]+)$', str(count), export_name)
             count += 1
-
+            
         os.mkdir(export_path)
             
         # create and export the OMEX file
         inline_omex = '\n'.join([self.model, self.phrasedml_str])  
         omex_file_name = 'input.omex'
         tellurium.exportInlineOmex(inline_omex, os.path.join(export_path, omex_file_name))
-        self.result_df.to_csv(os.path.join(export_path, 'raw_data.csv'))
+        self.raw_data.to_csv(os.path.join(export_path, 'raw_data.csv'))
         
         # export the processed data and the regression content
         self.processed_data.to_csv(os.path.join(export_path, 'processed_data.csv'))
-        self.hf.export(export_path)
+        if not self.biofilm:
+            self.hf.export(export_path, 'hillfit-regression')
         
         # export the figure
         self.figure.savefig(os.path.join(export_path, 'inactivation.svg'))
@@ -590,16 +592,16 @@ class PDIBacterialPkg():
         
         
     def data_parsing(self, target_reduction = None, target_time = None):
-        quantity = unit = None
+        value = unit = None
         if isnumber(target_reduction):
             if target_reduction > self.processed_data['inactivation'].iloc[-1]:
                 message = '--> ERROR: The inquired reduction is never reached.'
             else:
                 for index, point in self.processed_data.iterrows():
                     if point['inactivation'] >= target_reduction:
-                        message = f'hours to target: {index}'
-                        print(message)
-                        self.messages.append(message)
+                        value = index
+                        unit = 'hours'
+                        message = f'{unit} to target: {value}'
                         break
         elif isnumber(target_time):
             if target_time > self.processed_data.index[-1]:
@@ -607,14 +609,14 @@ class PDIBacterialPkg():
             else:
                 for index, point in self.processed_data.iterrows():
                     if index >= target_time:
-                        message = '%-inactivation at {}: {}'.format(target_time, point['inactivation']*100)
-                        print(message)
-                        self.messages.append(message)
+                        value = point['inactivation']*100
+                        unit = '%-inactivation'
+                        message = '{} at {}: {}'.format(unit, target_time, value)
                         break
         else:
             message = '--> ERROR: Neither the target_time nor the target_reduction are parameterized as numbers.'
             
         print(message)
-        self.messages.append(message)
-                
-        return quantity, unit
+        self.messages.append(message)    
+            
+        return value, unit

@@ -22,7 +22,6 @@ def test_cytoplasmic_membrane():
 
         message2 = 'volume:area consistency', round(self.variables['oxidized_area_ratio'],7) == round(self.variables['oxidized_membrane_volume_ratio'],7)
 
-
         # calculate the cellular and oxidation volumes
         membrane_volume = shell_volume(self.variables['cell_radius (m)'], membrane_inner_radius) # M^3
         outer_h = self.variables['cell_radius (m)'] * (1 - cos(radians(self.parameters['oxidation_angle'])))
@@ -32,7 +31,6 @@ def test_cytoplasmic_membrane():
 
         oxidized_volume = membrane_volume * self.variables['oxidized_membrane_volume_ratio']
 
-        
     if self.verbose:
         message1 = 'oxidized volume proportion: ', self.variables['oxidized_membrane_volume_ratio']
         self.messages.extend([message1, message2])

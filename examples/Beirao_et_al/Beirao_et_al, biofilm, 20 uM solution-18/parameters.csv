@@ -1,0 +1,19 @@
+,parameter,value
+0,simulation_path,"Beirao_et_al, biofilm, 20 uM solution-18"
+1,singlet_oxygen_diffusion_distance (m),8.0000E-8
+2,root_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\pdipy
+3,medium,water
+4,initial_time,0.0000E0
+5,total_time (s),4.3200E4
+6,timestep (s),1.8000E2
+7,solution_depth (m),1.2670E-2
+8,solution_area (m^2),1.9300E-4
+9,solution_volume (m^3),2.4453E-6
+10,bacterial_specie,S_aureus
+11,photosensitizer_selection,"5,10,15,20-tetrakis(1-methylpyridinium-4-yl)porphyrin tetra-iodide"
+12,soret (m),"{'upper': 4.3e-07, 'lower': 4.0000000000000003e-07}"
+13,q (m),"{'upper': 6.25e-07, 'lower': 5.3e-07}"
+14,visible (nm),"{'upper': 7.8e-07, 'lower': 3.9e-07}"
+15,light_source,OSRAM 2' 18W/840 lamps
+16,watts,7.7200E-3
+17,percent_oxidation_threshold,8.0000E0

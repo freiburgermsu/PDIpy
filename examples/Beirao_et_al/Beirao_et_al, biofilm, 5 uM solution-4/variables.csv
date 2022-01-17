@@ -1,0 +1,18 @@
+,variable,value
+0,simulation_path,"Beirao_et_al, biofilm, 5 uM solution-4"
+1,fa_g/L_conc,8.4772E-1
+2,fa_molar,6.9030E-3
+3,photosensitizer_molar,5.0000E-6
+4,photosensitizers,7.3630E15
+5,molecular_volume (m^3),1.2612E-28
+6,volume_proportion,3.7977E-7
+7,photon_moles_per_timestep,2.6205E-6
+8,dissolved_mo_molar,2.8126E-4
+9,eps_oxidation,1.0000E10
+10,e_ps_decay_time (s),8.2500E-9
+11,ps_excitation (s),5.0000E-14
+12,hv_photobleaching (s),1.4368E9
+13,so_qy,4.8000E-1
+14,e_ps_charge_transfer (s),2.0000E-8
+15,so_decay_time (s),6.0000E-5
+16,k_fa,6.5190E2

@@ -1,6 +1,0 @@
-matplotlib
-tellurium
-chemicals
-scipy
-pandas
-sigfig

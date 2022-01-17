@@ -8,16 +8,14 @@ setup(
   name = 'PDIpy',      
   package_dir = {'core':'pdipy'},
   packages = find_packages(),
-  package_data = {'pdipy': ['parameters/*.json']}, 
-  version = '0.0.1',
-  license = 'GNU',
-  description = "A tool for calculating cellular oxidation and death via photodynamic inactivation.", 
+  package_data = {'pdipy': ['parameters/*']}, 
+  version = '0.0.2',
+  license = 'MIT',
+  description = "Predicted %-inactivation from a chemical kinetics model of cytoplasmic oxidation via photodynamic inactivation.", 
   long_description = readme,
-  long_description_content_type = "text/markdown",
   author = 'Andrew Freiburger',               
   author_email = 'andrewfreiburger@gmail.com',
   url = 'https://github.com/freiburgermsu/PDIpy',   
-#   download_url = 'https://github.com/user/reponame/archive/v_01.tar.gz', 
-  keywords = ['antibacterial', 'photodynamic', 'biophysics'],
-  install_requires = ['matplotlib', 'tellurium', 'chemicals', 'scipy', 'pandas', 'sigfig']
+  keywords = ['antibacterial', 'photodynamic', 'biophysics', 'computational biology', 'medicine', 'PDI', 'antibiotics'],
+  install_requires = ['matplotlib', 'tellurium', 'chemicals', 'scipy', 'pandas', 'sigfig', 'hillfit']
 )
