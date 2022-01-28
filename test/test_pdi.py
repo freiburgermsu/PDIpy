@@ -1,19 +1,16 @@
+from math import pow, pi
 import pdipy
 
 
 def test_cytoplasmic_membrane():
-    # define calculation functions
-    def shell_volume(radi_1, radi_2, coeff = 1):
-        volume = (4*pi/3) * coeff * (radi_1**3 - radi_2**3)
-        return volume        
+    # define calculation functions     
     def sector_volume(r, h):
         volume = (2*pi/3)*r**2*h
         return volume       
     
     if self.bacterium['shape']['value'] == "sphere":            
         # calculate the cellular dimensions
-        self.variables['cell_radius (m)'] = pow((self.bacterium['cell_volume (pL)']['value']*pico/liter*3) / (4*pi), 1/3)
-        membrane_inner_radius = self.variables['cell_radius (m)'] - self.bacterium['membrane_thickness (nm)']['value'] * nano
+        
 
         #calculate the cellular and oxidation areas
         oxidized_cap_area = 2 * pi * self.variables['cell_radius (m)'] * outer_h
@@ -36,8 +33,7 @@ def test_cytoplasmic_membrane():
         self.messages.extend([message1, message2])
 
         print(message1)
-        print(message2)
-        
+        print(message2)        
         
         
 def test_photosensitizer_dimensions():

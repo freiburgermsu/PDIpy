@@ -38,16 +38,20 @@
       "reference": "W.Rawicz, K.C.Olbrich, T.McIntosh, D.Needham, E.Evans (2000). Effect of Chain Length and Unsaturation on Elasticity of Lipid Bilayers. Biophysical Journal, 79(1), 328–339. https://doi.org/10.1016/S0006-3495(00)76295-3"
     },
     "cell_mass (pg)": {
-      "value": 1,
+      "value": 1.048,
       "reference": "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
     },
-    "cell_volume (pL)": {
-      "value": 1,
+    "cell_volume (fL)": {
+      "value": 0.9357,
       "reference":  "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
   },
   "eps_oxidation_rate_constant":{
-	"value": 3.1623E4,
+	"value": 1,
 	"reference": null,
 	"notes": "This rate constant was empirically determined after calibrating the predictions with the Beirao et al., 2014 paper that constituted one of our examples"
+  },
+  "cellular_dry_mass_proportion_biofilm":{
+	"value": 0.1,
+	"reference": "The biofilm matrix; Flemming et al.; 2010.pdf"
   }
 }

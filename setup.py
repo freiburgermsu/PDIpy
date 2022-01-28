@@ -6,7 +6,7 @@ with open('README.rst') as file:
 
 setup(
   name = 'PDIpy',      
-  package_dir = {'core':'pdipy'},
+  package_dir = {'pdi':'pdipy'},
   packages = find_packages(),
   package_data = {'pdipy': ['parameters/*']}, 
   version = '0.0.2',
