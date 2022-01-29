@@ -234,7 +234,7 @@ Numerous entities are stored within the ``PDI`` object, and can be subsequently 
 
  from pdipy import PDI
 
-# define the simulation conditions
+ # define the simulation conditions
  pdi = PDI(total_time = 360)
  pdi.define_bacterium(bacterial_specie = 'S_aureus', bacterial_cfu_ml = 1e7)
  pdi.define_photosensitizer(photosensitizer = 'A3B_4Zn', photosensitizer_molar = 18e-9)
