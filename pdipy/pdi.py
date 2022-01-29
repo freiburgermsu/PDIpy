@@ -442,11 +442,14 @@ class PDI():
                 print(self.raw_data)
     
     def simulate(self,
+                 export_name: str = None,
+                 export_directory: str = None,
                  figure_title: str = None,             # the figure title
                  y_label: str = 'log10',               # the label of the y-axis for the figure 
                  exposure_axis: bool = False,          # signifying exposure on the x-axis instead of time
                  display_fa_oxidation: bool = False,   # optionally overlaying the fatty acid oxidation proportion in the figure  
-                 display_ps_excitation: bool = False
+                 display_ps_excitation: bool = False,
+                 export_content: bool = True
                  ):
         def asymptote(xs, limit, inactivation_y_values, top_increment, top_increment_change, count, relative_to_1 = 'greater'):
             if relative_to_1 == 'greater':
@@ -558,7 +561,10 @@ class PDI():
         self.ax.set_title(figure_title)
         self.ax.legend()    
         
-    def export(self, export_name = None, export_directory = None):       
+        if export_content:
+            self._export(export_name, export_directory)
+        
+    def _export(self, export_name, export_directory):       
         # define the simulation_path
         if export_directory is None:
             export_directory = os.getcwd()
@@ -630,7 +636,7 @@ class PDI():
                 print(variables_table)     
                 print(parameters_table)
         
-    def data_parsing(self,
+    def parse_data(self,
                      log_reduction: float = None, # the specified log_reduction that is achieved at the investigated time
                      target_time: float = None    # the specified time at which an investigated log_reduction is achieved
                      ):

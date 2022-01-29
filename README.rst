@@ -48,11 +48,11 @@ The simulation environment is defined:
  import pdipy
  pdi = pdipy.PDI(total_time, solution_dimensions = {}, surface_system = False, well_count = 24, timestep = 3, verbose = False, jupyter = False)
 
-- *total_time* ``float``: specifies the total simulated time.
+- *total_time* ``float``: specifies the total simulated time in minutes.
 - *simulation* ``dict``: defines the physical dimensions of the simulated solution, which are used to calculate photonic density and photosensitizer volume proportion.
 - *surface_system* ``bool``: specifies whether a photodynamic system with a surface-bound, cross-linked, photosensitizer will be simulated.
 - *well_count* ``int``: specifies the petri dish well count that will be simulated, which begets default dimensions of the simulated solution.
-- *timestep* ``int``: specifies the timestep value of the simulation, which subtly affects the log-reduction predictions at the end of the simulated time.  
+- *timestep* ``int``: specifies the timestep value in minutes of the simulation, which subtly affects the log-reduction predictions at the end of the simulated time.  
 - *verbose* ``bool``: specifies whether simulation details and calculated values will be printed. This is valuable for troubleshooting.
 - *jupyter* ``bool``: specifies whether the simulation is being conducted in a Jupyter Notebook, which allows ``display()`` to illustrate data tables and figures.
 
@@ -201,28 +201,16 @@ The aforementioned system specifications are refined into chemical parameters an
 
 .. code-block:: python
 
- pdi.simulate(figure_title = None, y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, display_ps_excitation = False)
-
-- *figure_title* & *y_label* ``str``: specify the title and y-axis label of the simulation figure, respectively. The value of ``None`` defaults to **Cytoplasmic oxidation and inactivation of < bacterial genera_specie > via PDI**.
-- *exposure_axis* ``bool``: specifies whether the x-axis of the simulation figure will be defined with cumulative exposure :math:`\frac{J}{cm^2}` over the simulation or in minutes of simulation time, where the latter is default.
-- *display_fa_oxidation* & *display_ps_excitation* ``bool``: determine whether the fatty acid oxidation or the photosensitizer excitation proportions, respectively, will be plotted with the reduction data.
-
-
-++++++++++++++++++++++
-export()
-++++++++++++++++++++++
-
-The simulation contents, including the regression plot and information, are exported to the desired location:
-
-.. code-block:: python
-
- pdi.export(self, export_name = None, export_directory = None)
+ pdi.simulate(export_name = None, export_directory = None, figure_title = None, y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, display_ps_excitation = False, export_content = True)
 
 - *export_name* & *export_directory* ``str``: specify the name and directory, respectively, to which the simulation contents will be saved, where ``None`` defaults to a folder name with simulation parameters **PDIpy-<photosensitizer_selection>-<bacterial_specie>-<count>** within the current workign directory.
-
+- *figure_title* & *y_label* ``str``: specify the title and y-axis label of the simulation figure, respectively. The y-axis label is vague to support generalization to plots where the fatty acid oxidation and photosensitizer excitation content is overlaid, and thus would be not appropriately described by more descriptive labels. The value of ``None`` defaults to **Cytoplasmic oxidation and inactivation of < bacterial genera_specie > via PDI**. 
+- *exposure_axis* ``bool``: specifies whether the x-axis of the simulation figure will be defined with cumulative exposure :math:`\frac{J}{cm^2}` over the simulation or in minutes of simulation time, where the latter is default.
+- *display_fa_oxidation* & *display_ps_excitation* ``bool``: determine whether the fatty acid oxidation or the photosensitizer excitation proportions, respectively, will be plotted with the reduction data.
+- *export_content* ``bool``: specifies whether the simulation content will be exported.
 
 ++++++++++++++++++++++
-data_parsing()
+parse_data()
 ++++++++++++++++++++++
 
 The processed data can be automatically processed through this function, as a convenient form of post-processing within the ``PDI`` object environment:
@@ -244,16 +232,19 @@ Numerous entities are stored within the ``PDI`` object, and can be subsequently 
 
 .. code-block:: python
 
- # conduct a pdipy simulation
  from pdipy import PDI
- pdi = PDI(total_time, solution_dimensions = {}, surface_system = False, well_count = 24, timestep = 3, verbose = False, jupyter = False)
- pdi.define_bacterium(bacterial_specie = None, bacterial_characteristics = {}, bacterial_cfu_ml = 1e6, biofilm = False)
- pdi.define_photosensitizer(photosensitizer = 'A3B_4Zn', photosensitizer_characteristics = {}, photosensitizer_molar = None, photosensitizer_g = 90e-9, cross_linked_sqr_m = 0.0191134)
- pdipy.define_light(measurement, light_source = None, light_characteristics = {})
- pdi.simulate(figure_title = None, y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, display_ps_excitation = False)
- pdi.export(self, export_name = None, export_directory = None)
 
- # evaluate the PDI object contents
+# define the simulation conditions
+ pdi = PDI(total_time = 360)
+ pdi.define_bacterium(bacterial_specie = 'S_aureus', bacterial_cfu_ml = 1e7)
+ pdi.define_photosensitizer(photosensitizer = 'A3B_4Zn', photosensitizer_molar = 18e-9)
+ pdi.define_light({'irradiance':}, light_source = 'LED')
+ 
+ # execute and export the simulation
+ pdi.simulate()
+
+ # evaluate the PDI object contents and parse the data
+ pdi.parse_data(log_reduction = 5)
  print(dir(pdi))
 
 The following list highlights stored content in the ``PDI`` object after a simulation:
