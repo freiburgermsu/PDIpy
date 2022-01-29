@@ -1,6 +1,6 @@
 {
 	"A3B_4Zn": {
-		"quantum_yield": {
+		"e_quantum_yield": {
 			"value": 0.6,
 			"reference": "Singlet Oxygen Yields and Radical Contributions in the Dye-Sensitised Photo-oxidation in methanol of esters of polyunsaturated fatty acids _oleic, linoleic, linolenic, and arachidonic) Chacon et al., 1988"
 		},
@@ -12,15 +12,11 @@
 			"value": "C76_H48_N16_F12_Zn",
 			"reference": null
 		},
-		"mw": {
-			"value": 1478.688,
-			"reference": null
-		},
-		"soret (nm)": {
+		"soret_nm": {
 			"value": [ 400, 430 ],
 			"reference": null
 		},
-		"q (nm)": {
+		"q_nm": {
 			"value": [ 530, 625 ],
 			"reference": null
 		},
@@ -32,14 +28,14 @@
 			},
 		"dimensions": {
 			"shape": "disc",
-			"length (A)": 32.8,
-			"width (A)": 32.8,
-			"depth (A)": 1.5,
+			"length_A": 32.8,
+			"width_A": 32.8,
+			"depth_A": 1.5,
 			"notes": "The depth is atomic thickness, as quantified by this paper https://www.nature.com/articles/ncomms1291."
 		}
 	},
 	"A3B_4Cu": {
-		"quantum_yield": {
+		"e_quantum_yield": {
 			"value": 0.6,
 			"reference": "Singlet Oxygen Yields and Radical Contributions in the Dye-Sensitised Photo-oxidation in methanol of esters of polyunsaturated fatty acids _oleic, linoleic, linolenic, and arachidonic) Chacon et al., 1988"
 		},
@@ -51,15 +47,11 @@
 			"value": "C76_H48_N16_F12_Cu",
 			"reference": null
 		},
-		"mw": {
-			"value": 1476.854,
-			"reference": null
-		},
-		"soret (nm)": {
+		"soret_nm": {
 			"value": [ 400, 430 ],
 			"reference": null
 		},
-		"q (nm)": {
+		"q_nm": {
 			"value": [ 530, 625 ],
 			"reference": null
 		},
@@ -71,7 +63,7 @@
 			}
 	},
 	"A3B_2Zn": {
-		"quantum_yield": {
+		"e_quantum_yield": {
 			"value": 0.6,
 			"reference": "Singlet Oxygen Yields and Radical Contributions in the Dye-Sensitised Photo-oxidation in methanol of esters of polyunsaturated fatty acids _oleic, linoleic, linolenic, and arachidonic) Chacon et al., 1988"
 		},
@@ -83,15 +75,11 @@
 			"value": "C60_H28_N10_F16_Zn",
 			"reference": null
 		},
-		"mw": {
-			"value": 1258.302,
-			"reference": null
-		},
-		"soret (nm)": {
+		"soret_nm": {
 			"value": [ 400, 430 ],
 			"reference": null
 		},
-		"q (nm)": {
+		"q_nm": {
 			"value": [ 530, 625 ],
 			"reference": null
 		},
@@ -103,7 +91,7 @@
 			}
 	},
 	"A3B_1Ga": {
-		"quantum_yield": {
+		"e_quantum_yield": {
 			"value": 0.6,
 			"reference": "Singlet Oxygen Yields and Radical Contributions in the Dye-Sensitised Photo-oxidation in methanol of esters of polyunsaturated fatty acids _oleic, linoleic, linolenic, and arachidonic) Chacon et al., 1988"
 		},
@@ -115,15 +103,11 @@
 			"value": "C45_H18_N7_F13_Ga",
 			"reference": null
 		},
-		"mw": {
-			"value": 973.385,
-			"reference": null
-		},
-		"soret (nm)": {
+		"soret_nm": {
 			"value": [ 400, 430 ],
 			"reference": null
 		},
-		"q (nm)": {
+		"q_nm": {
 			"value": [ 530, 625 ],
 			"reference": null
 		},

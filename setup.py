@@ -8,14 +8,17 @@ setup(
   name = 'PDIpy',      
   package_dir = {'pdi':'pdipy'},
   packages = find_packages(),
-  package_data = {'pdipy': ['parameters/*']}, 
+  package_data = {
+          'pdipy': ['parameters/*'],
+          'test': ['/*']
+          }, 
   version = '0.0.2',
   license = 'MIT',
-  description = "Predicted %-inactivation from a chemical kinetics model of cytoplasmic oxidation via photodynamic inactivation.", 
+  description = "Simulate Photodynamic Inactivation (PDI) of a Cocci Bacterium from a kinetics model of membrane oxidation.", 
   long_description = readme,
   author = 'Andrew Freiburger',               
   author_email = 'andrewfreiburger@gmail.com',
   url = 'https://github.com/freiburgermsu/PDIpy',   
-  keywords = ['antibacterial', 'photodynamic', 'biophysics', 'computational biology', 'medicine', 'PDI', 'antibiotics'],
-  install_requires = ['matplotlib', 'tellurium', 'chemicals', 'scipy', 'pandas', 'sigfig', 'hillfit']
+  keywords = ['antibacterial', 'photodynamic', 'biophysics', 'computational', 'biology', 'medicine', 'PDI', 'antibiotics'],
+  install_requires = ['matplotlib', 'tellurium', 'scipy', 'pandas', 'sigfig', 'hillfit', 'chemw', 'numpy']
 )

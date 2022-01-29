@@ -1,284 +1,269 @@
-ROSSpy
-_______
+Simulating Photodynamic Inactivation of a Cocci bacterium 
+------------------------------------------------------------------------
 
------------
-Motivation
------------
+|PyPI version| |Actions Status| |Downloads| |License|
 
-Desalination is an unavoidable technology for meeting the 6th UN Sustainable Development Goal of providing potable for all people. Reverse Osmosis (RO) is the leading desalination technology, although, it can be further improved in energy efficiency and economic practicality by mitigating membrane fouling like mineral scaling. The geochemistry of mineral scaling is generally inaccessible to physical experimentation, and existing software programs to simulate scaling geochemistry -- e.g. French Creek -- are esoteric and/or financially expensive. 
+.. |PyPI version| image:: https://img.shields.io/pypi/v/pdipy.svg?logo=PyPI&logoColor=brightgreen
+   :target: https://pypi.org/project/pdipy/
+   :alt: PyPI version
 
-We therefore developed a `Reverse Osmosis Scaling Software in Python (ROSSpy) <https://pypi.org/project/ROSSpy/>`_ as an open-source software that simulates scaling geochemistry through `PHREEQC <https://www.usgs.gov/software/phreeqc-version-3>`_. ROSSpy essentially translates user specifications of an RO system into a 1D reactive transport model of the RO membrane-solution interface in the feed channel that is then translated into PHREEQ code and executed via `PHREEQpy <https://pypi.org/project/phreeqpy/>`_. Examples abound in the `ROSSpy GitHub <https://github.com/freiburgermsu/ROSSpy>`_, and demonstrate the breadth and accuracy of ROSSpy for research. The underlying calculations and logic are detailed in our manuscript of ROSSpy [under-review]. We encourage users and developers to share critiques and suggestions for improving ROSSpy as an open-source community resource that may expedite RO research and resolving water insecurities.
+.. |Actions Status| image:: https://github.com/freiburgermsu/pdipy/workflows/Test%20PDIpy/badge.svg
+   :target: https://github.com/freiburgermsu/pdipy/actions
+   :alt: Actions Status
 
-++++++++++++++++
+.. |License| image:: https://img.shields.io/badge/License-MIT-blue.svg
+   :target: https://opensource.org/licenses/MIT
+   :alt: License
+
+.. |Downloads| image:: https://pepy.tech/badge/pdipy
+   :target: https://pepy.tech/project/pdipy
+   :alt: Downloads
+
+Antibiotic resistance is developing medical crisis that is projected to surpass cancer in annual deaths by mid-21st century. Photodynamic Inactivation (PDI) is a promising treatment method that escapes resistance evolution and may be an essential technology to hamper the growing threat of resistant pathogens; however, the requisite rate of research to mitigate the somber projections of resistant pathogens requires computational tools that can improve experimental design and efficiency in developing PDI treatments.
+
+`PDIpy <https://pypi.org/project/pdipy/>`_ is offered to fulfill this role as the first API that simulates PDI biochemistry. PDIpy accepts user inputs of an experimental system and calculates parameters that are implemented into a `Tellurium <https://tellurium.readthedocs.io/en/latest/walkthrough.html>`_ kinetic system and visually expressed. Post-processing of the simulation data is supported with a built-in function, and the simulation contents can be exported for external post-processing at the discretion of the user. The directory of the `PDIpy GitHub <https://github.com/freiburgermsu/pdipy>`_ articulates a few case studies of replicating experimental data in Jupyter Notebooks. Users and developers are encouraged to critique and improve PDIpy, as an open-source library, through `GitHub issues <https://github.com/freiburgermsu/pdipy/issues>`_. 
+
+____________
+
+
+PDIpy API
+--------------
+
+++++++++++++++++++++++
 Installation
-++++++++++++++++
+++++++++++++++++++++++
 
-ROSSpy is installed in a command prompt, Powershell, Terminal, or Anaconda Command Prompt (to use the program in Anaconda environments like Jupyter Notebook and Spyder) via the PyPI command::
+pdipy is installed in a command prompt, Powershell, Terminal, or Anaconda Command Prompt via ``pip``::
 
- pip install rosspy
+ pip install pdipy
 
------------
-Concept
------------
-
-The ROSSpy framework represents RO desalination as a 1D reactive transport model of the membrane-solution interface in the feed channel of an RO module. The feed solution can be represented either by a single, homogeneous, solution domain or by a dual solution domain -- where the bulk solution is simulated separately from the concentration polarization (CP) that forms adjacent to the filtration membrane in the feed channel. Experimental evidence supports that the dual-domain is more fundamentally accurate, however, representing this model in PHREEQC has proven elusive, thus ROSSpy currently only supports the single-domain. The accuracy of the single-domain is nevertheless verified in the *examples/scaling/scaling_validation* directory of our `ROSSpy GitHub <https://github.com/freiburgermsu/ROSSpy>`_. The inlet boundary is defined by the Dirichlet condition, where the feed is assumed to be an infinite reservoir, and the outlet boundary is defined by the Cachy condition, where the effluent is assumed to be dependent upon the reactive transport processes of the RO module. 
-
-
-----------------------
-Functions
-----------------------
-
-ROSSpy is organized into Python functions, within the ``ROSSPkg`` class object, that serve specified purposes or types of calculations. Each of these functions are detailed in the following sub-sections.
-
-
-+++++++++++
+++++++++++++++++++++++
 __init__
-+++++++++++
+++++++++++++++++++++++
 
-The simulation environment is defined::
+The simulation environment is defined:
 
- import rosspy
- ross = rosspy.ROSSPkg(operating_system = 'windows', verbose = False, jupyter = False)
+.. code-block:: python
 
-- *operating_system* ``str``: specifies whether the user is using a ``windows`` or ``unix`` system, which directs subtle differences in importing the PHREEQpy package and incorporating comments to the ``PQI`` PHREEQ input files.
-- *verbose* ``bool``: specifies whether simulation details and calculated values will be printed. This is valuable for trobuleshooting.
-- *jupyter* ``bool``: specifies whether the simulation is being conducted in a Jupyter Notebook, which allows ``display()`` of data tables and figures.
+ import pdipy
+ pdi = pdipy.PDI(total_time, solution_dimensions = {}, surface_system = False, well_count = 24, timestep = 3, verbose = False, jupyter = False)
 
+- *total_time* ``float``: specifies the total simulated time.
+- *simulation* ``dict``: defines the physical dimensions of the simulated solution, which are used to calculate photonic density and photosensitizer volume proportion.
+- *surface_system* ``bool``: specifies whether a photodynamic system with a surface-bound, cross-linked, photosensitizer will be simulated.
+- *well_count* ``int``: specifies the petri dish well count that will be simulated, which begets default dimensions of the simulated solution.
+- *timestep* ``int``: specifies the timestep value of the simulation, which subtly affects the log-reduction predictions at the end of the simulated time.  
+- *verbose* ``bool``: specifies whether simulation details and calculated values will be printed. This is valuable for troubleshooting.
+- *jupyter* ``bool``: specifies whether the simulation is being conducted in a Jupyter Notebook, which allows ``display()`` to illustrate data tables and figures.
 
-++++++++++++++++
-define_general
-++++++++++++++++
+++++++++++++++++++++++
+define_bacterium()
+++++++++++++++++++++++
 
-The general conditions of the simulation are defined::
+The characteristics of the simulated bacterium are defined from either a parameter file in the ``pdipy/parameters/bacteria`` directory or in a dictionary argument:
 
- ross.define_general(database_selection, simulation = 'scaling', domain_phase = None, 
- quantity_of_modules = 1, simulation_type = 'transport', simulation_title = None)
+.. code-block:: python
 
-- *database_selection* ``str``: specifies which PHREEQ database file -- ``Amm``, ``ColdChem``, ``core10``, ``frezchem``, ``iso``, ``llnl``, ``minteq``, ``minteq.v4``, ``phreeqc``, ``pitzer``, ``sit``, ``Tipping_Hurley``, or ``wateq4f`` -- will be imported and used to execute the simulation.
-- *simulation* ``str``: specifies whether the ``scaling`` or ``brine`` of the simulation will be evaluated.
-- *domain_phase* ``str``: specifies whether the ``mobile`` (i.e. bulk solution) or the ``immobile`` (i.e. the CP solution layer) will be evaluated for dual domain simulations. Parameterizing an argument other than ``None`` implicitly signifies that simulation of the dual-domain model, as opposed to the default single-domain model.  
-- *quantity_of_modules* ``int``: specifies the number of in-series RO modules that will be simulated.
-- *simulation_type* ``str``: specifies whether RO reactive transport ``transport``, or the geochemistry of ``evaporation``, will be simulated with the parameterized feed solution.
-- *simulation_title* ``str``: specifies the title of the simulation, which is only observed in the PHREEQC ``PQI`` input file.
+ pdi.define_bacterium(bacterial_specie = None, bacterial_characteristics = {}, bacterial_cfu_ml = 1e6, biofilm = False)
 
+- *bacterial_specie* ``str``: specifies one of the bacteria in the ``parameters`` directory to simulate, where *S. aureus* is imported by default. The imported parameters from this selection are overwritten by the ``bacterial_characteristics``, and thus the two arguments are not exclusive.
+- *bacterial_characteristics* ``dict``: provides custom characteristics of the simulated bacterium, which supplants characteristics from the ``bacterial_specie`` argument. The expected dictionary keys ``shape``, ``membrane_thickness_nm``, ``cell_mass_pg``, ``"cell_volume_fL``, ``eps_oxidation_rate_constant``, and ``cellular_dry_mass_proportion_biofilm`` are all themselves dictionaries that follow a simple structure:
 
-+++++++++++
-transport
-+++++++++++
+.. code-block:: json
 
-Spatiotemporal conditions for reactive transport simulations are defined::
+ {
+    	  "value": 0.268,
+    	  "reference": "A. G. O’DONNELL, M. R. NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V. HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+    	  "notes": "All saturated SCFAs were summed from Table 2 for all S. aureus entries."
+ }
 
- ross.transport(simulation_time, simulation_perspective = None, 
- module_characteristics = {}, timestep = None, cells_per_module = 12, 
- kinematic_flow_velocity = None, exchange_factor = 1e5)
+The ``reference`` and ``notes`` keys are optional, yet may be important for provenance and reproducibility of the simulation results. The final key of ``bacterial_characteristics`` is ``membrane_chemicals``, which contains as values each chemical group that constitutes the respective membrane, such as ``BCFA`` for branch-chain fatty acids and ``SCFA`` for straight-chain fatty acids. The sub-structure of these values are provided exemplified by the following content for the ``"SCFA"`` entry for *S. aureus*:
 
-- *simulation_time* ``float``: specifies the total simulated time in seconds.
-- *simulation_perspective* ``str``: specifies whether the simulation data is parsed to view the end of the module over the entire simulated time "all_time" or to view the entire module distance at the final timestep ``all_distance``. The ``None`` parameter defaults to ``all_time`` for brine simulations and ``all_distance`` for scaling simulations.
-- *module_characteristics* ``dict``: specifies custom RO specifications that diverge from those of the default DOW FILMTEC BW30-400 RO module. The expected ``keys`` of the dictionary are 
+.. code-block:: json
 
- + 'module_diameter_mm'
- + 'permeate_tube_diameter_mm'
- + 'module_length_m'
- + 'permeate_flow_m3_per_day' 
- + 'max_feed_flow_m3_per_hour'
- + 'membrane_thickness_mm' 
- + 'feed_thickness_mm'
- + 'active_m2'
- + 'permeate_thickness_mm'
- + 'polysulfonic_layer_thickness_mm'
- + 'support_layer_thickness_mm'. 
-
- The ``values`` for the dictionary are all floats in the units that are listed at the end of the corresponding key.
- 
-- *timestep* ``float``: specifies the simulation timestep in seconds. The ``None`` parameter defaults to the maximum timestep that still adheres to the Courant Condition of maintaining simulated resolution.
-- *cells_per_module* ``int``: specifies the quantity of cells into an RO module is discretized. This primarily controls the resolution of data and plots over the distance of the module, and thus is only consequential for ``simulation_perspective = "all_distance"``.
-- *kinematic_flow_velocity* ``float``: specifies the kinetic flow velocity of the feed solution. The ``None`` parameter defaults to 9.33E-7 (m^2/sec).
-- *exchange_factor* ``float``: specifies the kinetic rate of exchange (1/sec) between the mobile and immobile phases of a dual domain simulation.
+ {
+     "density_gL": {
+          "value": 0.94,
+          "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density"],
+          "notes": "The density for all saturated fatty acids is estimated as stearic acid."
+          },
+     "formula": [
+          "C20_H38_O2",
+          "C18_H34_O2",
+          "C16_H30_O2"
+          ],
+	 "proportion": {
+	      "value": 0.268,
+	      "reference": "A. G. O’DONNELL, M. R. NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V. HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+	      "notes": "All saturated SCFAs were summed from Table 2 for all S. aureus entries."
+          }
+  }
 
 
-+++++++++++
-reaction
-+++++++++++
+- *bacterial_cfu_ml* ``float``: specifies the bacterial concentration for simulations of solution-based photosensitizers. 
+- *biofilm* ``bool``: specifies whether a biofilm will be simulated.
 
-The permeate flux gradient in reactive transport simulations, or the rate of evaporation in evaporation simulations, is calculated::
++++++++++++++++++++++++++++++++
+define_photosensitizer()
++++++++++++++++++++++++++++++++
 
- ross.reaction(final_cf = None, permeate_efficiency = 1, head_loss = 0.89, evaporation_steps = 15)
+Defines the simulated photosensitizer:
 
-- *final_cf* ``float``: specifies the effluent CF of the last module in the simulated RO system. The ``None`` parameter indicates that the ``linear_permeate`` permeate flux method will be used, while any numerical value indicates that a ``linear_cf`` permeate flux method will be used. 
-- *permeate_efficiency* ``float``: specifies 0<=PE<=1 proportion of calculated permeate flux that actually filters from the feed solution. This is useful for distinguishing fresh RO modules from aged and partly compromised RO modules in ROSSpy simulation.
-- *head_loss* ``float``: specifies the 0<=HL<=1 proportion of effluent pressure relative to the influent. The default value of 0.89 (“Reverse osmosis desalination: Modeling and experiment” by Fraidenraich et al., 2009) corresponds to an 11% pressure drop.
+.. code-block:: python
+
+ pdi.define_photosensitizer(photosensitizer = 'A3B_4Zn', photosensitizer_characteristics = {}, photosensitizer_molar = None, photosensitizer_g = 90e-9, cross_linked_sqr_m = 0.0191134)
+
+- *photosensitizer* ``str``: specifies which photosensitizer from the predefined options in the ``pdipy/parameters/photosensitizers.json`` parameter file will be simulated.
+- *photosensitizer_characteristics* ``dict``: defines characteristics of the simulation photosensitizer, which can be used to refine the parameterized photosensitizer. The expected structure of the dictionary are keys with dictionary substructure according to the following example:
+
+.. code-block:: json
+
+ {
+		"e_quantum_yield": {
+			"value": 0.6,
+			"reference": "Singlet Oxygen Yields and Radical Contributions in the Dye-Sensitised Photo-oxidation in methanol of esters of polyunsaturated fatty acids _oleic, linoleic, linolenic, and arachidonic) Chacon et al., 1988"
+		},
+		"so_specificity": {
+			"value": 0.8,
+			"reference": null
+		},
+		"formula": {
+			"value": "C76_H48_N16_F12_Zn",
+			"reference": null
+		},
+		"soret_nm": {
+			"value": [ 400, 430 ],
+			"reference": null
+		},
+		"q_nm": {
+			"value": [ 530, 625 ],
+			"reference": null
+		},
+		"charge": 4,
+		"photobleaching_constant (cm^2/J)": {
+			"value": 1.74e-7,
+			"reference": "“Photobleaching kinetics, photoproduct formation, and dose estimation during ALA induced PpIX PDT of MLL cells under well oxygenated and hypoxic conditions” by Dysart et al., 2005",
+			"notes": "The 0.015 value from literature is divided by 8.64e4 -- the quantity of seconds in a day -- to yield a sensible value. A similar value is discovered from “PHOTOBLEACHING OF PORPHYRINS USED IN PHOTODYNAMIC THERAPY AND  IMPLICATIONS FOR THERAPY” by Mang et al., 1987"
+			},
+		"dimensions": {
+			"shape": "disc",
+			"length_A": 32.8,
+			"width_A": 32.8,
+			"depth_A": 1.5,
+			"notes": "The depth is atomic thickness, as quantified by this paper https://www.nature.com/articles/ncomms1291."
+		} 
+ }
+
+The ``value`` sub-key in the dictionary substructures, where it is present, is the only necessary sub-key for each parameter.
+
+- *photosensitizer_molar* ``float``: specifies the photosensitizer molar concentration for solution simulations.
+- *photosensitizer_g* ``float``: specifies the mass of photosensitizer that is surface-bound in cross-linked simulations.
+- *cross_linked_sqr_m* ``float``: defines the square-meters area that is coated with the bound photosensitizer from the ``photosensitizer_g`` parameter, for cross-linked  simulations.
+- *parameterized_ph_charge* ``bool``: specifies whether the pH will be charged balance, where ``True`` prevents the parameterization of alkalinity in the feed solution. 
 
 
-+++++++++++
-solutions
-+++++++++++
 
-The geochemistry of the feed solution is parameterized, either through specifying a complete parameter file that is imported from the *rosspy/water_bodies* directory of the ROSSpy package, or through passing a dictionary of same content as organization as an argument::
+++++++++++++++++++++++
+define_light()
+++++++++++++++++++++++
 
- ross.solutions(water_selection = '', water_characteristics = {}, 
- solution_description = '', parameterized_ph_charge = True)
+This function is used to parse and execute pre-existing input file:
 
-- *water_selection* ``str``: specifies which feed water from the *rosspy/water_bodies* directory will be simulated. ROSSpy offers by default  parameter files for natural waters -- i.e. the ``red_sea`` and the ``mediterranean_sea`` -- and produced waters from fracking oil wells -- i.e. ``bakken_formation``, ``marcellus_appalachian_basin``, ``michigan_basin``, ``north_german_basin``, ``palo_duro_basin``, or ``western_pennsylvania_basin``. Other parameter files can be created and called in simulations by emulating the syntax of these default files and storing the created parameter files in the aforementioned directory of these files.
-- *water_characteristics* ``dict``: defines the geochemistry and conditions that will simulate the feed solution. The expected ``keys`` are 
+.. code-block:: python
 
- + 'element'
- + 'temperature'
- + 'pe'
- + 'Alkalinity' 
- + 'pH'
- 
-Each of the ``values`` of these keys is itself a dictionary, with the keys of "value" that denotes the numerical value of the entry and "reference" that denotes the experimental citation for the numerical value. The "element" key deviates slightly from this organization, where another layer of dictionaries is introduced for each ion in the feed. Each ion dictionary possesses the "concentration (ppm)" key to specify the ppm concentration of the designated ion and the "form" key to signify the mineral form of the parameterized ion, in addition to the aforementioned "reference" key. The following dictionary illustrates this organization, which is also exemplified in the default water body parameter files.
+ pdipy.define_light(measurement, light_source = None, light_characteristics = {})
 
-{
-    "element": {
-        "Mn": {
-            "concentration (ppm)": 3000,
+- *measurement* ``dict``: provides the unit and quantity of the photonic intensity measurement of the light source in a key-value pair. The supported unit options are: ``irradiance`` in :math:`\frac{mW}{cm^2}`, ``exposure`` in :math:`\frac{J}{cm^2}`, ``lux`` in :math:`\frac{lumen}{m^2}`, and ``lumens`` in :math:`lumens`.
+- *light_source* ``str``: specifies a light source from the predefined options in the ``pdipy/parameters/light_source.json`` parameter file will be simulated. 
+- *light_characteristics* ``dict``: specifies custom characteristics of the light source, which overwrite characteristics that are specified from the ``light_source`` option. The expected structure of the dictionary are keys with dictionary substructure according to the following example:
 
-            "reference": "Haluszczak, Rose, and Kump, 2013 [estimated from another Marcellus publication]"
-			
-        }, 
+.. code-block:: json
 
-        "Si": {
-            "concentration (ppm)": 95,
-
-            "reference": "Haluszczak, Rose, and Kump, 2013 [reported average from another Marcellus publication]",
-
-            "form": "SiO2"
-			
-        }
-		
+ {
+    "visible_proportion": {
+      "value": 0.1,
+      "reference": "Macisaac et al., 1999"
     },
-
-    "temperature": {
-        "value": 24,
-
-        "reference": "Dresel and Rose, 2010"
-		
+    "lumens_per_watt": {
+      "value": 3,
+      "reference": "Michael F. Hordeski. Dictionary Of Energy Efficiency Technologies. Fairmont Press. ISBN: 9780824748104"
     }
-	
-}
+  }
 
-- *solution_description* ``str``: briefly describes the solution in the name of the simulation folder.
-- *parameterized_ph_charge* ``bool``: specifies whether the pH will be charged balance, which consequently prevents the parameterization of alkalinity in the feed solution. 
+where the ``value`` sub-key in the dictionary substructures is the only necessary sub-key for each parameter.
 
 
-+++++++++++++++++++++
-equilibrium_phases
-+++++++++++++++++++++
+++++++++++++++++++++++
+simulate()
+++++++++++++++++++++++
 
-The minerals, and pre-existing equilibria conditions, that will be explored in scaling simulations are defined::
+The aforementioned system specifications are refined into chemical parameters and are executed in a ``Tellurium`` kinetic model:
 
- ross.equilibrium_phases(block_comment = '', ignored_minerals = [], 
- existing_parameters = {})
+.. code-block:: python
 
-- *block_comment* ``str``: describes the minerals or scaling phenomena only in the ``PQI`` file.
-- *ignored_minerals* ``list``: defines the minerals that will be excluded from the determined set of minerals that can potentially precipitate from the parameterized feed ions.
-- *existing_parameters* ``dict``: specifies pre-existing equilibria conditions that influence the geochemical calculations of PHREEQ. The expected ``keys`` are the referenced mineral names and the respective ``values`` are
+ pdi.simulate(figure_title = None, y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, display_ps_excitation = False)
 
- + 'saturation'
- + 'initial_moles'
- 
-which correspond to the pre-existing saturation index and the initial moles of the respective mineral in the simulated system.
+- *figure_title* & *y_label* ``str``: specify the title and y-axis label of the simulation figure, respectively. The value of ``None`` defaults to **Cytoplasmic oxidation and inactivation of < bacterial genera_specie > via PDI**.
+- *exposure_axis* ``bool``: specifies whether the x-axis of the simulation figure will be defined with cumulative exposure :math:`\frac{J}{cm^2}` over the simulation or in minutes of simulation time, where the latter is default.
+- *display_fa_oxidation* & *display_ps_excitation* ``bool``: determine whether the fatty acid oxidation or the photosensitizer excitation proportions, respectively, will be plotted with the reduction data.
 
 
-++++++++++++++++
-selected_output
-++++++++++++++++
+++++++++++++++++++++++
+export()
+++++++++++++++++++++++
 
-The simulation content that will be incorporated to the output file is defined::
+The simulation contents, including the regression plot and information, are exported to the desired location:
 
- ross.selected_output(output_filename = None)
+.. code-block:: python
 
-- *output_filename* ``str``: specifies the name of a simulation output file that will be created when the input file is executed.
+ pdi.export(self, export_name = None, export_directory = None)
 
-
-+++++++++++
-export
-+++++++++++
-
-The simulation parameters, raw and processed data, figures, and the input file are exported into a designated labeled folder for the simulation::
-
- ross.export(simulation_name = None, input_path = None, 
- output_path = None, external_file = False)
-
-- *simulation_name* ``str``: specifies the name of the simulation folder to which simulation content will be exported. The ``None`` parameter assigns a default name for the simulation folder, which follows the format of **date-ROSSpy-water_selection-simulation_type-database_selection-simulation-simulation_perspective-#**. 
-- *input_path* ``str``: specifies the directory path to where the input file will be exported. The ``None`` parameter exports the input file as "input.pqi" to the curent working directory. 
-- *output_path* ``str``: specifies the directory path to where the output file will be exported. The ``None`` parameter exports the output file as "selected_output.csv" to the curent working directory.
-- *external_file* ``str``: specifies whether the input file of the simulation was imported and parsed from a pre-existing ``PQI`` file, and thus was not created through the aforementioned ROSSpy functions.
+- *export_name* & *export_directory* ``str``: specify the name and directory, respectively, to which the simulation contents will be saved, where ``None`` defaults to a folder name with simulation parameters **PDIpy-<photosensitizer_selection>-<bacterial_specie>-<count>** within the current workign directory.
 
 
-++++++++++++++++
-parse_input
-++++++++++++++++
+++++++++++++++++++++++
+data_parsing()
+++++++++++++++++++++++
 
-A pre-existing input file is parsed and interpreted for simulation::
+The processed data can be automatically processed through this function, as a convenient form of post-processing within the ``PDI`` object environment:
 
- ross.parse_input(input_file_path, simulation, water_selection = None, 
- simulation_name = None, active_m2= None)
+.. code-block:: python
 
-- *input_file_path* ``str``: specifies the path of the input file that will be imported, parsed, and simulated. 
-- *simulation* ``str``: defines parsing the simulation data for either ``scaling`` or ``brine``. 
-- *water_selection* ``str``: describes the feed water of the input file that will be simulated. 
-- *simulation_name* ``str``: specifies the name of the simulation folder to which all of the simulation files will be exported, identical to this parameter for the aforementioned ``export()`` function of ROSSpy. The ``None`` parameter likewise defaults to the aforementioned naming scheme. 
-- *active_m2* ``float``: defines the area of active filtration in the simulated RO module. The ``None`` parameter defaults to 37 from the FILMTEC BW30-400 module. 
+ pdi.data_parsing(log_reduction = None, target_time = None)
 
+- *log_reduction* ``float``: inquires at what time the specified log-reduction is achieved 
+- *target_time* ``float``: inquires what log-reduction is achieved that the specified time
 
-+++++++++++
-execute
-+++++++++++
-
-The input file is executed through PHREEQ::
-
- ross.execute(simulated_to_real_time = 9.29)
-
-- *simulated_to_real_time* ``float``: specifies the ratio of simulated time to real computational time when executing ROSSpy simulations. This is used to approximate the time that is required for the simulation to complete. The default ``9.29`` ratio represented simulations of multiple days or weeks, while shorter simulations of minutes/hours have a higher ratio, perhaps around ``20``.
-
-- Note: The raw simulation data is returned by this function as a ``pandas.DataFrame`` object, which can be arbitrarily manipulated by the user through `pandas operations <https://pandas.pydata.org/pandas-docs/stable/reference/frame.html>`_.
+____________
 
 
-++++++++++++++++++++++++++
-process_selected_output
-++++++++++++++++++++++++++
-
-The simulation data is processed into figures and corresponding data tables::
-
- ross.process_selected_output(selected_output_path = None, scale_ions = True, 
- plot_title = None, title_font = 'xx-large', label_font = 'x-large', 
- x_label_number = 6, export_name = None, export_format = 'svg', individual_plots = None)
-
-- *selected_output_path* ``str``: specifies the path of a simulation output file that will be processed into data tables and figures. This imported file can be independent of executing ROSSpy, and thus can be used to process old data. The ``None`` parameter constrains the function to only process data that resides in the ROSSpy object from a recent execution.
-- *scale_ions* ``bool``: specifies whether the scale, from ``scaling`` simulations, will be collectivized and refined into quantities of individual ions that constitute the mineral scale. The ionic quantities are exported in a JSON file to the simulation folder, with the other simulation content. The default value is ``True``.
-- *plot_title* ``str``: specifies the title of the simulation figure. The ``None`` parameter defaults to titles that are customized with the simulation (``scaling`` or ``brine``), the water body, and the total simulation time.
-- *title_font* & *label_font* ``str``: these specify the fonts of the figure title and axis labels, respectively, in terms of MatPlotLib font identifications: ``xx-small``, ``x-small``, ``small``, ``medium``, ``large``, ``x-large``, or ``xx-large``. 
-- *x_label_number* ``int``: quantifies the ticks along the x-axis in the simulation figure.
-- *export_name* ``str``: specifies the export name of the simulation figure. The default names are ``brine`` for ``brine`` simulations, and ``all_minerals`` or an individual mineral name (e.g. ``Gypsum``) for ``scaling`` simulations, depending upon a ``False`` or ``True`` value of the *individual_plots* argument, respectively.
-- *export_format* ``str``: specifies the format of the exported simulation figure, from the MatPlotLib options: ``svg``, ``pdf``, ``png``, ``jpeg``, ``jpg``, or ``eps``.
-- *individual_plots* ``bool``: specifies whether each mineral of ``scaling`` simulations are plotted and exported in individual figures, or whether all precipitated minerals are plotted and exported together in a combined single figure. The ``None`` parameter defaults to "True" for the "all_time" *simulation_perspective* or "False" otherwise.
-- Note: The processed simulation data, which predicated the figures, is returned by this function as a ``pandas.DataFrame`` object, which can be arbitrarily manipulated by the user through `pandas operations <https://pandas.pydata.org/pandas-docs/stable/reference/frame.html>`_.
-
-
-----------------------
-Execution
+Accessible content
 ----------------------
 
-ROSSpy is executed through a deliberate sequence of the aforementioned functions::
- 
- import rosspy
- ross = rosspy.ROSSPkg()
- ross.define_general(database_selection, simulation)
- ross.transport(simulation_time, simulation_perspective, )
- ross.reaction(final_cf)
- ross.solutions(water_selection, water_characteristics)
- ross.equilibrium_phases()
- ross.selected_output()
- ross.export()
- raw_data = ross.execute()
- processed_data = ross.process_selected_output()
+Numerous entities are stored within the ``PDI`` object, and can be subsequently used in a workflow. The complete list of content within the ``PDI`` object can be identified and printed through the built-in ``dir()`` function in the following example sequence:
 
-ROSSpy can be tested with a simple built-in ``test()`` function, which can be executed through these three lines::
+.. code-block:: python
 
- import rosspy
- ross = rosspy.ROSSPkg(operating_system = 'windows', verbose = False, jupyter = False)
- ross.test()
+ # conduct a pdipy simulation
+ from pdipy import PDI
+ pdi = PDI(total_time, solution_dimensions = {}, surface_system = False, well_count = 24, timestep = 3, verbose = False, jupyter = False)
+ pdi.define_bacterium(bacterial_specie = None, bacterial_characteristics = {}, bacterial_cfu_ml = 1e6, biofilm = False)
+ pdi.define_photosensitizer(photosensitizer = 'A3B_4Zn', photosensitizer_characteristics = {}, photosensitizer_molar = None, photosensitizer_g = 90e-9, cross_linked_sqr_m = 0.0191134)
+ pdipy.define_light(measurement, light_source = None, light_characteristics = {})
+ pdi.simulate(figure_title = None, y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, display_ps_excitation = False)
+ pdi.export(self, export_name = None, export_directory = None)
 
-The ``Test()`` function executes a predefined sample simulation, which should exemplify the use of the ROSSpy API and the analysis of the exported outputs.
+ # evaluate the PDI object contents
+ print(dir(pdi))
+
+The following list highlights stored content in the ``PDI`` object after a simulation:
+
+- *raw_data* & *processed_data* ``Pandas.DataFrame``: `Pandas DataFrames <https://pandas.pydata.org/pandas-docs/stable/reference/frame.html>`_ that contain the raw and processed simulation data, respectively. This files are also exported through the export function.
+- *model* & *phrasedml_str* ``str``: The kinetic model and its corresponding `SED-ML <https://sed-ml.org/>`_ plot, respectively, composed in a string that can be read by Tellurium and converted into the standard XML formats of these languages.
+- *bacterium*, *photosensitizer*, & *light* ``dict``: Dictionaries of the simulation parameters for the bacterium, photosensitizer, and light, respectively.
+- *parameters*, *variables*, & *results* ``dict``: Dictionaries that possess the input parameters, calculation variables, and simulation results, respectively.
+- *figure* & *ax* ``MatplotLib.Pyplot.subplots``: The `MatPlotLib objects <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.subplot.html#matplotlib.pyplot.subplot>`_ of the simulation figure, which allows the user to externally manipulate the figure without recreating a new figure from the raw or processed data.
+- *chem_mw* ``ChemMW``: The ``ChemMW`` object from the `ChemW module <https://pypi.org/project/ChemW/>`_, which allows users to calculate the molecular weight from a string of any chemical formula. The formatting specifications are detailed in the README of the ChemW module. 
+- *hf* ``HillFit``: The `HillFit object <https://pypi.org/project/hillfit/>`_ is stored, from which the Hill-equation regrssion parameters, equation string, and R\ :sup:`2`\ of the fitted equation can be programmatically accessed, in addition to being exported with the ``PDIpy`` content through the ``export()`` function.
+- *bacteria* ``list``: A list of all the predefined bacteria parameter files, from which a user can easily simulate via the ``PDI`` object.
+- *light_parameters*, *photosensitizers*, & *solution* ``dict``: Dictionaries of the predefined options and parameters for the light sources, photosensitizers, and solution dimensions, respectively.
