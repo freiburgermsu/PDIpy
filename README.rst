@@ -38,7 +38,7 @@ pdipy is installed in a command prompt, Powershell, Terminal, or Anaconda Comman
  pip install pdipy
 
 ++++++++++++++++++++++
-__init__
+__init__()
 ++++++++++++++++++++++
 
 The simulation environment is defined:
@@ -243,7 +243,7 @@ Numerous entities are stored within the ``PDI`` object, and can be subsequently 
  # execute and export the simulation
  pdi.simulate()
 
- # evaluate the PDI object contents and parse the data
+ # parse the data and evaluate the PDI object contents
  pdi.parse_data(log_reduction = 5)
  print(dir(pdi))
 

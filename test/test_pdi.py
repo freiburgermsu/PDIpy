@@ -1,6 +1,47 @@
 from math import pow, pi
-import pdipy
+from pdipy import PDI
+import os. re
 
+
+
+def test_init():
+    # define the PDI instance
+    pdi = PDI(total_time = 300)
+    
+    # assert the presence of content
+    for bol in ['surface_system', ]:
+        assert type(pdi.parameters[bol]) is bool 
+    for dic in [pdi.light_parameters, pdi.photosensitizers, pdi.defined_model]:
+        assert type(dic) is dict
+    for quant in ['so_diffusion_m', 'total_time_s', 'timestep_s', 'solution_depth_m', 'solution_sqr_m', 'solution_cub_m']:
+        assert type(pdi.parameters[param]) is float
+        
+    assert type(pdi.bacteria) is list
+    assert os.path.exists(pdi.parameters['root_path'])
+    
+def test_define_bacterium():
+    # define simulation conditions
+    bacterial_characteristics = {
+            "cellular_dry_mass_proportion_biofilm": {
+                    'value':0.3            
+            },
+            "membrane_thickness_nm": {
+                    'value': 8
+            }
+    }
+                    
+    # define the PDI instance
+    pdi = PDI(total_time = 300)
+    pdi.define_bacterium('S_aureus', bacterial_characteristics, bacterial_cfu_ml = 1e5)
+    
+    # assert the presence of content
+    for bol in ['surface_system', ]:
+        assert type(pdi.parameters[bol]) is bool 
+    for dic in [pdi.light_parameters, pdi.photosensitizers, pdi.defined_model]:
+        assert type(dic) is dict
+    for quant in ['so_diffusion_m', 'total_time_s', 'timestep_s', 'solution_depth_m', 'solution_sqr_m', 'solution_cub_m']:
+        assert type(pdi.parameters[param]) is float
+    
 
 def test_cytoplasmic_membrane():
     # define calculation functions     
