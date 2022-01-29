@@ -238,7 +238,7 @@ Numerous entities are stored within the ``PDI`` object, and can be subsequently 
  pdi = PDI(total_time = 360)
  pdi.define_bacterium(bacterial_specie = 'S_aureus', bacterial_cfu_ml = 1e7)
  pdi.define_photosensitizer(photosensitizer = 'A3B_4Zn', photosensitizer_molar = 18e-9)
- pdi.define_light({'irradiance':}, light_source = 'LED')
+ pdi.define_light({'irradiance': 8}, light_source = 'LED')
  
  # execute and export the simulation
  pdi.simulate()
