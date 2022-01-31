@@ -1,6 +1,6 @@
 from scipy.constants import femto, pico, angstrom, nano, micro, milli, centi, liter, N_A, h, c, minute, hour
 from math import pi, cos, ceil
-from numpy import array, log10, diff
+from numpy import array, log10, diff, logspace
 from matplotlib import pyplot
 from hillfit import HillFit
 from sigfig import round
@@ -276,12 +276,12 @@ class PDI():
         lumens_per_watt = self.light['lumens_per_watt']['value']
         if 'irradiance' in measurement: # mW / cm^2
             self.parameters['watts'] = (measurement['irradiance']*milli/centi**2) * self.area
-        elif 'exposure' not in measurement:  # J / cm^2
+        elif 'exposure' in measurement:  # J / cm^2
             simulation_time = self.parameters['total_time_s'] * minute
             self.parameters['watts'] = (measurement['exposure']/centi**2) / simulation_time * self.area
-        elif 'lux' not in measurement: # lumen / m^2
+        elif 'lux' in measurement: # lumen / m^2
             self.parameters['watts'] = measurement['lux'] / lumens_per_watt * self.area
-        elif 'lumens' not in measurement: # lumen
+        elif 'lumens' in measurement: # lumen
             self.parameters['watts'] = measurement['lumens'] / lumens_per_watt
         else:
             error = '--> ERROR: The light source has an unrecognized dimension.'
@@ -384,7 +384,17 @@ class PDI():
         k_rlx_so = 1/self.variables['so_decay_time_s']
         
         # ============== define fatty acid and EPS oxidation ==============
-        k_fa = self.variables['k_fa'] = 7.69E2 * self.variables['fa_gL_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
+         # The values are attenuated from this study of unsaturated vegetable oil (10.5650/jos.ess18179), since the bacterial fatty acids are saturated and are not embedded with antioxidants like vitammin E that protects these oils.
+        k_fa = 10**(2+log10(self.parameters['watts']))*2E2
+        if self.parameters['watts'] > 1e-4:
+            k_fa = 4E1  
+            if self.parameters['watts'] > 0.01:
+                k_fa = 7E1 
+                if self.parameters['watts'] > 1:
+                    k_fa = 1.2E2  
+                    
+        k_fa *= self.variables['fa_gL_conc']
+        self.variables['k_fa']  = k_fa
         fa = self.variables['fa_molar']
         k_fa_reduction = (self.parameters['bacterial_cfu_ml']/1E6)**0.1      # arbitrary reduction, dependent upon the CFU concentration
         k_fa /= k_fa_reduction
@@ -402,7 +412,7 @@ class PDI():
             ps => b_ps ; {k_b_ps}*ps
             e_ps + mo => so + ps;  {qy}*{k_so}*e_ps*mo
             so => mo; {k_rlx_so}*so
-            so + fa => o_fa + mo; {k_fa}*so*fa
+            so + fa => o_fa; {k_fa}*so*fa
             {biofilm}
 
             # define concentrations
@@ -542,18 +552,22 @@ class PDI():
                  display_ps_excitation: bool = False,
                  export_contents: bool = True
                  ):
-        def asymptote(xs, limit, inactivation_y_values, top_increment, top_increment_change, count, relative_to_1 = 'greater'):
-            if relative_to_1 == 'greater':
-                while inactivation_y_values[-1] > limit:
-                    inactivation_y_values = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
+        def asymptote(xs, limit, inactivation_ys, top_increment, top_increment_change, count, relative_to_limit):
+            if inactivation_ys[-1] < limit:
+                relative_to_limit = 'lesser'
+            if relative_to_limit == 'lesser':
+                while inactivation_ys[-1] < limit:
+#                    print(inactivation_ys[-1])
+                    inactivation_ys = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
+                    top_increment -= top_increment_change
+                    count += 1
+            elif relative_to_limit == 'greater':
+                while inactivation_ys[-1] > limit:
+#                    print(inactivation_ys[-1])
+                    inactivation_ys = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
                     top_increment += top_increment_change
                     count += 1
-            elif relative_to_1 == 'lesser':
-                while inactivation_y_values[-1] < limit:
-                    inactivation_y_values = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
-                    top_increment += top_increment_change
-                    count += 1
-            return count, inactivation_y_values, top_increment
+            return count, inactivation_ys, top_increment
         
         # calculate the kinetics of the simulation 
         self._singlet_oxygen_calculations()
@@ -561,8 +575,8 @@ class PDI():
                     
         # parse the simulation results
         x_values = []
-        oxidation_y_values = []
-        excitation_y_values = []
+        oxidation_ys = []
+        excitation_ys = []
         first = True
         for index, point in self.raw_data.iterrows():      # cytoplasmic oxidation may not be 1:1 correlated with reduction
             if first:                                      # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
@@ -574,11 +588,11 @@ class PDI():
             x_values.append(x_value)
             # calculate the oxidation_proportion of the cytoplasmic fatty acids
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
-            oxidation_y_values.append(oxidation_proportion)
+            oxidation_ys.append(oxidation_proportion)
             
             # calculate the PS excitation proportion 
             excitation_proportion = point['[e_ps]'] / (point['[ps]'] + point['[e_ps]'] + point['[b_ps]'])
-            excitation_y_values.append(excitation_proportion)
+            excitation_ys.append(excitation_proportion)
 
         # create the DataFrame of processed data  
         xs = array(x_values)   
@@ -588,24 +602,28 @@ class PDI():
             
         self.processed_data = pandas.DataFrame(index = list(xs))
         self.processed_data.index.name = index_label
-        self.processed_data['oxidation'] = oxidation_y_values
-        self.processed_data['excitation'] = excitation_y_values
-        self.processed_data['log10-oxidation'] = -log10(1-array(oxidation_y_values))
-        self.processed_data['log10-excitation'] = -log10(1-array(excitation_y_values))
+        self.processed_data['oxidation'] = oxidation_ys
+        self.processed_data['excitation'] = excitation_ys
+        self.processed_data['log10-oxidation'] = -log10(1-array(oxidation_ys))
+        self.processed_data['log10-excitation'] = -log10(1-array(excitation_ys))
                         
         # determine the regression equation for the fitted curve via the Hill equation
-        ys = array(oxidation_y_values)
+        ys = array(oxidation_ys)
         if ys[0] >= ys[-1]:
             raise ValueError(f'The last oxidation proportion {ys[-1]} is less than or equal to the first oxidation proportion {ys[0]}, which is non-physical. Change the simulation conditions and attempt another simulation.')  
         self.hf = HillFit(xs, ys)
         self.hf.fitting(x_label = index_label, y_label = 'oxidation proportion', view_figure = False)
         
         # define and refine the fitted Hill equation parameters
-        increments = [0.01*self.hf.top, -0.00001*self.hf.top, 0.000001*self.hf.top, -0.0000001*self.hf.top, 0.00000001*self.hf.top]
+        num_increments = 7+log10(self.parameters['watts'])
+        increments = logspace(-1,-(num_increments+4),ceil(num_increments))*self.hf.top
+        
         top_increment = 0.01*self.hf.top
         ec50_change = -.76*self.hf.ec50
-        nH_change = 1.24*self.hf.nH
-        limit = 1
+        nH_change = self.hf.nH # +self.parameters['watts']
+        
+        limit = 1-10**-(2*self.parameters['watts']-log10(1-oxidation_ys[-1]))
+        print(limit)
         if self.parameters['biofilm']:
             increments = [0.01*self.hf.top, -0.00001*self.hf.top, 0.000001*self.hf.top]
             top_increment = 0.01*self.hf.top
@@ -614,19 +632,19 @@ class PDI():
             limit = 1-10**-7
 
         # refine the regression equation of oxidation into plots of log-reduction 
-        inactivation_y_values = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
+        inactivation_ys = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
         count = 0
-        relative_to_1 = 'greater'
+        relative_to_limit = 'greater'
         for top_increment_change in increments:
-            count, inactivation_y_values, top_increment = asymptote(xs, limit, inactivation_y_values, top_increment, top_increment_change, count, relative_to_1)
+            count, inactivation_ys, top_increment = asymptote(xs, limit, inactivation_ys, top_increment, top_increment_change, count, relative_to_limit)
             print('refinement loop: ', count)
-            if relative_to_1 == 'greater':
-                relative_to_1 = 'lesser'
+            if relative_to_limit == 'greater':
+                relative_to_limit = 'lesser'
             else:
-                relative_to_1 = 'greater'
+                relative_to_limit = 'greater'
                 
-        self.processed_data['inactivation'] = inactivation_y_values
-        self.processed_data['log10-inactivation'] = -log10(1-array(inactivation_y_values)) 
+        self.processed_data['inactivation'] = inactivation_ys
+        self.processed_data['log10-inactivation'] = -log10(1-array(inactivation_ys)) 
         
         # create the figure
         pyplot.rcParams['figure.figsize'] = (11, 7)
@@ -640,15 +658,15 @@ class PDI():
             sec_ax = self.ax.twinx()
             sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
             sec_ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
-            sec_ax.set_ylim(0.8,1.05)
-            sec_ax.legend()
+            sec_ax.set_ylim(0,1.05)
+            sec_ax.legend(loc = 'lower right')
             
         self.ax.set_ylabel(y_label)
         self.ax.set_xlabel(index_label)
         if figure_title is None:
             figure_title = 'Cytoplasmic oxidation and inactivation of {} via PDI'.format(self.parameters['bacterial_specie'])
         self.ax.set_title(figure_title)
-        self.ax.legend()    
+        self.ax.legend(loc = 'lower center')    
 
         if self.verbose:
             message = f'The oxidation data was refined into inactivation data after {count} loops'

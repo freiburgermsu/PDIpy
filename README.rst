@@ -21,7 +21,7 @@ Simulating Photodynamic Inactivation of a Cocci bacterium
 
 Antibiotic resistance is developing medical crisis that is projected to surpass cancer in annual deaths by mid-21st century. Photodynamic Inactivation (PDI) is a promising treatment method that escapes resistance evolution and may be an essential technology to hamper the growing threat of resistant pathogens. The requisite rate of research to mitigate these somber projections requires computational tools that can improve and expedite experimental research in developing PDI treatments.
 
-`PDIpy <https://pypi.org/project/pdipy/>`_ is offered as the first comprehensive software of PDI to fulfill this by simulating PDI biochemistry from a chemical kinetics model. PDIpy accepts user inputs of an experimental system, executes a `Tellurium <https://tellurium.readthedocs.io/en/latest/walkthrough.html>`_ kinetic system, and expresses and exports the results through CSV spreadsheets and SVG images. Post-processing of the simulation data is further supported with a function that parses the based upon user parameters. The examples directory of the `PDIpy GitHub <https://github.com/freiburgermsu/pdipy>`_ exemplifies PDIpy through replicating experimental observations. Users and developers are encouraged to critique and improve PDIpy, as an open-source library, through `GitHub issues <https://github.com/freiburgermsu/pdipy/issues>`_. 
+`PDIpy <https://pypi.org/project/pdipy/>`_ is offered as the first comprehensive software of PDI to fulfill this by simulating PDI biochemistry from a chemical kinetics model. PDIpy accepts user inputs of an experimental system, executes a `Tellurium <https://tellurium.readthedocs.io/en/latest/walkthrough.html>`_ kinetic system, and expresses and exports the results through CSV spreadsheets and SVG images. Post-processing of the simulation data is further supported with a function that parses the based upon user parameters. The `examples directory <https://github.com/freiburgermsu/pdipy/examples>`_ of the PDIpy GitHub exemplifies PDIpy through replicating experimental observations. Users and developers are encouraged to critique and improve PDIpy, as an open-source library, through `GitHub issues <https://github.com/freiburgermsu/pdipy/issues>`_. 
 
 ____________
 
@@ -46,7 +46,8 @@ The simulation environment is defined:
 .. code-block:: python
 
  import pdipy
- pdi = pdipy.PDI(total_time, solution_dimensions = {}, surface_system = False, well_count = 24, timestep = 3, verbose = False, jupyter = False)
+ pdi = pdipy.PDI(total_time, solution_dimensions = {}, surface_system = False, 
+                 well_count = 24, timestep = 3, verbose = False, jupyter = False)
 
 - *total_time* ``float``: specifies the total simulated time in minutes.
 - *simulation* ``dict``: defines the physical dimensions of the simulated solution, which are used to calculate photonic density and photosensitizer volume proportion.
@@ -64,7 +65,10 @@ The characteristics of the simulated system are concisely defined in a single fu
 
 .. code-block:: python
 
- pdi.define_conditions(bacterial_specie = None, bacterial_characteristics = {}, bacterial_cfu_ml = 1e6, biofilm = False, photosensitizer = 'A3B_4Zn', photosensitizer_characteristics = {}, photosensitizer_molar = None, photosensitizer_g = 90e-9, cross_linked_sqr_m = 0.0191134, light_source = None, light_characteristics = {}, measurement = {})
+ pdi.define_conditions(bacterial_specie = None, bacterial_characteristics = {}, 
+       bacterial_cfu_ml = 1e6, biofilm = False, photosensitizer = 'A3B_4Zn', 
+       photosensitizer_characteristics = {}, photosensitizer_molar = None, photosensitizer_g = 90e-9, 
+       cross_linked_sqr_m = 0.0191134, light_source = None, light_characteristics = {}, measurement = {})
 
 - *bacterial_specie* ``str``: specifies one of the bacteria in the ``pdipy/parameters/bacteria`` directory, where *S. aureus* is imported by default. These imported parameters are overwritten by the ``bacterial_characteristics``, and can be used in conjunction.
 - *bacterial_characteristics* ``dict``: provides custom characteristics of the simulated bacterium that supplant imported characteristics from the ``bacterial_specie`` argument. The expected dictionary keys ``shape``, ``membrane_thickness_nm``, ``cell_mass_pg``, ``"cell_volume_fL``, ``eps_oxidation_rate_constant``, and ``cellular_dry_mass_proportion_biofilm`` are all themselves dictionaries that follow a simple structure:
@@ -177,7 +181,9 @@ The aforementioned system specifications are refined into chemical parameters an
 
 .. code-block:: python
 
- pdi.simulate(export_name = None, export_directory = None, figure_title = None, y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, display_ps_excitation = False, export_content = True)
+ pdi.simulate(export_name = None, export_directory = None, figure_title = None, 
+            y_label = 'log10', exposure_axis = False, display_fa_oxidation = False, 
+            display_ps_excitation = False, export_content = True)
 
 - *export_name* & *export_directory* ``str``: specify the name and directory, respectively, to which the simulation contents will be saved, where ``None`` defaults to a folder name with simulation parameters **PDIpy-<photosensitizer_selection>-<bacterial_specie>-<count>** within the current workign directory.
 - *figure_title* & *y_label* ``str``: specify the title and y-axis label of the simulation figure, respectively. The y-axis label is vague to support generalization to plots where the fatty acid oxidation and photosensitizer excitation content is overlaid, and thus would be not appropriately described by more descriptive labels. The value of ``None`` defaults to **Cytoplasmic oxidation and inactivation of < bacterial genera_specie > via PDI**. 
@@ -216,7 +222,8 @@ Numerous entities are stored within the ``PDI`` object, and can be subsequently 
 
  # define the simulation conditions
  pdi = PDI(total_time = 360)
- pdi.define_conditions(bacterial_specie = 'S_aureus', bacterial_cfu_ml = 1e7, photosensitizer = 'A3B_4Zn', photosensitizer_molar = 18e-9, measurement = {'irradiance': 8}, light_source = 'LED')
+ pdi.define_conditions(bacterial_specie = 'S_aureus', bacterial_cfu_ml = 1e7, 
+ photosensitizer = 'A3B_4Zn', photosensitizer_molar = 18e-9, measurement = {'irradiance': 8}, light_source = 'LED')
  
  # execute and export the simulation
  pdi.simulate()
