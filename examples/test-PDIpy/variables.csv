@@ -1,0 +1,20 @@
+,variable,value
+0,fa_gL_conc,8.4772E-1
+1,fa_molar,6.8231E-3
+2,cell_radius_m,6.067586923880104e-05
+3,membrane_cub_m,1.8504324594515124e-16
+4,fa_mass_proportion,1.4968021035555687e-28
+5,photosensitizer_molar,1.8e-08
+6,photosensitizers,2.6507E13
+7,molecular_volume_cub_m,1.2674441401642661e-27
+8,volume_proportion,1.3738908631511486e-08
+9,photon_moles_per_timestep,2.705019291530107e-06
+10,dissolved_mo_molar,2.8799E-1
+11,e_ps_decay_time_s,8.250000000000001e-09
+12,ps_excitation_s,5e-14
+13,hv_photobleaching_s,7.1839E8
+14,so_qy,4.8000E-1
+15,e_ps_charge_transfer_s,2e-08
+16,so_decay_time_s,3.75e-05
+17,k_fa,6.5190E2
+18,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\test-PDIpy

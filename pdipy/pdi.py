@@ -38,22 +38,24 @@ def average(num_1, num_2 = None):
         raise None # ValueError('The arguments must be numbers or a list of numbers')
     
 def isnumber(num):
+    remainder = re.sub('[0-9e.-]', '', str(num))
+    if remainder != '':
+        return False
     try:
         float(num)
-        return True
     except:
         try:
             int(num)
-            return True
         except:
             return False
+    return True
 
 class PDI():
     def __init__(self, 
                  total_time: float,              # The total simulation time
                  solution_dimensions: dict = {}, # defines dimensions of the simulated solution 
                  surface_system: bool = False,   # specifies whether cross-linked photosensitizer will be simulated
-                 well_count: float = 24,        # The petri dish well count that will be simulated, which begets default dimensions of the simulated solution
+                 well_count: str = 24,        # The petri dish well count that will be simulated, which begets default dimensions of the simulated solution
                  timestep: float = 3,            # The simulation timestep value, which subtly affects the simulation predictions
                  verbose: bool = False,     
                  jupyter: bool = False
@@ -62,11 +64,12 @@ class PDI():
         self.parameters = {}
         self.variables = {}
         self.results = {}
+        self.paths = {}
         self.defined_model = {}
         self.messages = []
         self.verbose = verbose
         self.jupyter = jupyter
-        self.chem_mw = ChemMW()
+        self.chem_mw = ChemMW(printing = False)
         
         # initial parameters
         self.parameters['surface_system'] = surface_system
@@ -84,6 +87,7 @@ class PDI():
         self.parameters['timestep_s'] = timestep * minute
         
         # define the solution 
+        well_count = str(well_count)
         self.solution = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')))[well_count]
         if solution_dimensions != {}:
             for key, value in solution_dimensions.items():
@@ -98,7 +102,7 @@ class PDI():
         self.defined_model.update({'define_system':True})
         
                 
-    def define_bacterium(self, 
+    def _define_bacterium(self, 
                          bacterial_specie: str = None,    # specifies one of the bacteria in the parameters directory of PDI to simulate
                          bacterial_characteristics: dict = {},      # passes a custom dictionary of characteristics of the simulated bacterium, which can refine characteristics from the bacterial_specie argument
                          bacterial_cfu_ml: float = 1E6,   # specifies the solution concentration of the simulated bacterium for solution simulations
@@ -118,12 +122,12 @@ class PDI():
             self.parameters['bacterial_specie'] = bacterial_specie
             self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json')))
         if bacterial_characteristics != {}:
-            for key, value in bacterial_specie.items():
+            for key, value in bacterial_characteristics.items():
                 if key == 'name':
                     self.parameters['bacterial_specie'] = value
                 else:
                     for key2, value2 in value.items():
-                        self.bacterial_specie[key][key2] = value2 
+                        self.bacterium[key][key2] = value2 
        
         # the fatty acid concentrations of the cytoplasmic membrane are determined
         self.variables['fa_gL_conc'] = total_proportion = 0
@@ -135,7 +139,7 @@ class PDI():
             if re.search('FA', chemical):
                 fa_density_proportion = self.bacterium['membrane_chemicals'][chemical]['density_gL']['value'] * self.bacterium['membrane_chemicals'][chemical]['proportion']['value']
                 self.variables['fa_gL_conc'] += fa_density_proportion
-                mw = average([chem_mw.mass(formula) for formula in self.bacterium['membrane_chemicals'][chemical]['formula']])
+                mw = average([self.chem_mw.mass(formula) for formula in self.bacterium['membrane_chemicals'][chemical]['formula']])
                 weighed_mws.append(mw*fa_density_proportion/total_proportion)
         self.variables['fa_molar'] = self.variables['fa_gL_conc'] / average(weighed_mws)
         
@@ -151,7 +155,7 @@ class PDI():
         self.defined_model.update({'define_bacterium':True})
                 
 
-    def define_photosensitizer(self, 
+    def _define_photosensitizer(self, 
                                photosensitizer: str = 'A3B_4Zn',     # specify which photosensitizer from the predefined options will be simulated
                                photosensitizer_characteristics: dict = {},   # Custom specifications of the simulation photosensitizer, which can be used to refine the parameterized photosensitizer
                                photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
@@ -203,7 +207,7 @@ class PDI():
         photosensitizer_mw = self.chem_mw.mass(self.photosensitizer['formula']['value'])
                                           
         if not self.parameters['surface_system']:
-            if self.variables['photosensitizer_molar'] is None:
+            if photosensitizer_molar is None:
                 error = '--> ERROR: A molar photosensitizer concentration must be defined for systems of dissolved photosensitizers.'
                 self.messages.append(error)
                 raise TypeError(error)
@@ -246,29 +250,28 @@ class PDI():
         self.defined_model.update({'define_photosensitizer':True})
                 
 
-    def define_light(self, 
+    def _define_light(self, 
                      light_source: str = None,             # specifies a light source from the predefined options
                      light_characteristics: dict = {},      # specifies custom characteristics of the light source, in addition to or substitute of a predefined option
                      measurement: dict = None,              # provides the measurement, in the proper respective units, for the photonic intensity of the light source
                      ):
         # define properties of the light source
         self.parameters['visible_m'] = [390*nano, 780*nano]
-        self.light = self.light_parameters['LED']
-        if type(light_source) is dict:
-            for key, value in light_source.items():
-                if key == 'name':
-                    self.parameters['light_source'] = value                        
-                else:
-                    for key2, value2 in value.items():
-                        self.light[key][key2] = value2
-        elif light_source in self.light_parameters: 
+        self.parameters['light_source'] = 'LED'
+        self.light = self.light_parameters[self.parameters['light_source']]
+        if light_source is not None:
             self.parameters['light_source'] = light_source
-            self.light = self.light_parameters[light_source]
-        else:
-            error = f'--> ERROR: The light source {light_source} is neither a predefined option nor a customized dictionary.'
-            self.messages.append(error)
-            ValueError(error)
-        
+            if light_source in list(self.light_parameters.keys()): 
+                self.light = self.light_parameters[self.parameters['light_source']]
+#        else:
+#            error = f'--> ERROR: The light source {light_source} is neither a predefined option nor a customized dictionary.'
+#            self.messages.append(error)
+#            ValueError(error)
+            
+        if light_characteristics != {}:
+            for key, value in light_characteristics.items():                 
+                self.light[key] = value
+    
         # define the available light
         lumens_per_watt = self.light['lumens_per_watt']['value']
         if 'irradiance' in measurement: # mW / cm^2
@@ -288,7 +291,26 @@ class PDI():
         # completion of the function
         self.defined_model.update({'define_light':True})
         
-    def _completed_functions(self,):
+    def define_conditions(self,
+                         bacterial_specie: str = None,    # specifies one of the bacteria in the parameters directory of PDI to simulate
+                         bacterial_characteristics: dict = {},      # passes a custom dictionary of characteristics of the simulated bacterium, which can refine characteristics from the bacterial_specie argument
+                         bacterial_cfu_ml: float = 1E6,   # specifies the solution concentration of the simulated bacterium for solution simulations
+                         biofilm: bool = False,          # specifies whether a biofilm simulation will be conducted
+                         photosensitizer: str = 'A3B_4Zn',     # specify which photosensitizer from the predefined options will be simulated
+                         photosensitizer_characteristics: dict = {},   # Custom specifications of the simulation photosensitizer, which can be used to refine the parameterized photosensitizer
+                         photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
+                         photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
+                         cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
+                         light_source: str = None,             # specifies a light source from the predefined options
+                         light_characteristics: dict = {},      # specifies custom characteristics of the light source, in addition to or substitute of a predefined option
+                         measurement: dict = None,              # provides the measurement, in the proper respective units, for the photonic intensity of the light source
+                          ):
+        self._define_bacterium(bacterial_specie, bacterial_characteristics, bacterial_cfu_ml, biofilm)
+        self._define_photosensitizer(photosensitizer, photosensitizer_characteristics, photosensitizer_molar, photosensitizer_g)                         
+        self._define_light(light_source, light_characteristics, measurement)
+            
+    def _singlet_oxygen_calculations(self,):
+        # ensure that all prior functions have completed within this instance
         missing_functions = []
         for function in self.defined_model:
             if not self.defined_model[function]:
@@ -297,10 +319,6 @@ class PDI():
                 error = f'--> ERROR: The {function} function must be defined before the simulation can execute.'
                 self.messages.append(error)
                 raise SystemError(error)
-            
-    def _singlet_oxygen_calculations(self,):
-        # ensure that all prior functions have completed within this instance
-        self._completed_functions()
                 
         # define the light watts
         excitation_visible_proportion = (self.parameters['excitation_range_m'] / diff(self.parameters['visible_m']))[0]
@@ -366,7 +384,7 @@ class PDI():
         k_rlx_so = 1/self.variables['so_decay_time_s']
         
         # ============== define fatty acid and EPS oxidation ==============
-        k_fa = self.variables['k_fa'] = 7.69E2 * self.variables['fa_g/L_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
+        k_fa = self.variables['k_fa'] = 7.69E2 * self.variables['fa_gL_conc'] # https://www.jstage.jst.go.jp/article/jos/68/1/68_ess18179/_pdf/-char/ja
         fa = self.variables['fa_molar']
         k_fa_reduction = (self.parameters['bacterial_cfu_ml']/1E6)**0.1      # arbitrary reduction, dependent upon the CFU concentration
         k_fa /= k_fa_reduction
@@ -440,6 +458,79 @@ class PDI():
                 display(self.raw_data)
             else:
                 print(self.raw_data)
+                
+    def _export(self, export_name, export_directory):       
+        # define the simulation_path
+        if export_directory is None:
+            export_directory = os.getcwd()
+        elif not os.path.exists(export_directory):
+            error = '--> ERROR: The provided directory does not exist'
+            self.messages.append(error)
+            raise ImportError(error)
+            
+        if export_name is None:
+            export_name = '-'.join([re.sub(' ', '_', str(x)) for x in ['PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie']]])
+            
+        # make the simulation directory
+        count = -1
+        self.paths['export_path'] = os.path.join(export_directory, export_name)
+        while os.path.exists(self.paths['export_path']):
+            count += 1
+            if not re.search('(-[0-9]+$)', self.paths['export_path']):
+                self.paths['export_path'] += f'-{count}'   
+            else:
+                self.paths['export_path'] = re.sub('([0-9]+)$', str(count), self.paths['export_path'])
+            
+        os.mkdir(self.paths['export_path'])
+            
+        # create and export the OMEX file
+        inline_omex = '\n'.join([self.model, self.phrasedml_str])  
+        omex_file_name = 'pdipy_input.omex'
+        tellurium.exportInlineOmex(inline_omex, os.path.join(self.paths['export_path'], omex_file_name))
+        
+        # export the CSVs and regression content
+        self.raw_data.to_csv(os.path.join(self.paths['export_path'], 'raw_data.csv'))
+        self.processed_data.to_csv(os.path.join(self.paths['export_path'], 'processed_data.csv'))
+        if not self.parameters['biofilm']:                                   #!!! Why does the specification of a biofilm simulation significantly influence the ability to export the regression plot?
+            self.hf.export(self.paths['export_path'], 'hillfit-regression')
+        
+        # export the figure
+        self.figure.savefig(os.path.join(self.paths['export_path'], 'inactivation.svg'))
+        if self.verbose:
+            if not self.jupyter:
+                self.figure.show()
+        
+        # define and export tables of parameters and variables
+        self.parameters['simulation_path'] = self.variables['simulation_path'] = self.paths['export_path']
+        parameters = {'parameter':[], 'value':[]}
+        for parameter, value in self.parameters.items():
+            parameters['parameter'].append(parameter)
+            if isnumber(value):
+                parameters['value'].append(sigfigs_conversion(value, 5))
+            else:
+                parameters['value'].append(value)      
+                
+        variables = {'variable':[], 'value':[]}
+        for variable, value in self.variables.items():
+            variables['variable'].append(variable)
+            if isnumber(value):
+                variables['value'].append(sigfigs_conversion(value, 5))
+            else:
+                variables['value'].append(value)
+                
+        parameters_table = pandas.DataFrame(parameters)
+        parameters_table.to_csv(os.path.join(self.paths['export_path'], 'parameters.csv'))
+        
+        variables_table = pandas.DataFrame(variables)   
+        variables_table.to_csv(os.path.join(self.paths['export_path'], 'variables.csv'))
+        
+        if self.verbose:
+            if self.jupyter:
+                display(parameters_table)
+                display(variables_table)
+            else:
+                print(variables_table)     
+                print(parameters_table)
     
     def simulate(self,
                  export_name: str = None,
@@ -449,7 +540,7 @@ class PDI():
                  exposure_axis: bool = False,          # signifying exposure on the x-axis instead of time
                  display_fa_oxidation: bool = False,   # optionally overlaying the fatty acid oxidation proportion in the figure  
                  display_ps_excitation: bool = False,
-                 export_content: bool = True
+                 export_contents: bool = True
                  ):
         def asymptote(xs, limit, inactivation_y_values, top_increment, top_increment_change, count, relative_to_1 = 'greater'):
             if relative_to_1 == 'greater':
@@ -478,10 +569,9 @@ class PDI():
                 first = False
                 continue
             x_value = index/hour
-            if exposure_axis:
-                x_value *= (self.parameters['watts']*hour/self.parameters['cross_linked_surface_sqr_m'])
-            x_values.append(x_value) # sigfigs_conversion(index))
-            
+            if exposure_axis:  # J/cm^2
+                x_value *= self.parameters['watts']*hour/(self.area/centi**2)
+            x_values.append(x_value)
             # calculate the oxidation_proportion of the cytoplasmic fatty acids
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_y_values.append(oxidation_proportion)
@@ -490,11 +580,25 @@ class PDI():
             excitation_proportion = point['[e_ps]'] / (point['[ps]'] + point['[e_ps]'] + point['[b_ps]'])
             excitation_y_values.append(excitation_proportion)
 
+        # create the DataFrame of processed data  
+        xs = array(x_values)   
+        index_label = 'time (hr)'
+        if exposure_axis:
+            index_label = 'exposure (J/cm\N{superscript two})'
+            
+        self.processed_data = pandas.DataFrame(index = list(xs))
+        self.processed_data.index.name = index_label
+        self.processed_data['oxidation'] = oxidation_y_values
+        self.processed_data['excitation'] = excitation_y_values
+        self.processed_data['log10-oxidation'] = -log10(1-array(oxidation_y_values))
+        self.processed_data['log10-excitation'] = -log10(1-array(excitation_y_values))
+                        
         # determine the regression equation for the fitted curve via the Hill equation
-        xs = array(x_values)
         ys = array(oxidation_y_values)
+        if ys[0] >= ys[-1]:
+            raise ValueError(f'The last oxidation proportion {ys[-1]} is less than or equal to the first oxidation proportion {ys[0]}, which is non-physical. Change the simulation conditions and attempt another simulation.')  
         self.hf = HillFit(xs, ys)
-        self.hf.fitting(x_label = 'time (hr)', y_label = 'oxidation proportion', view_figure = False)
+        self.hf.fitting(x_label = index_label, y_label = 'oxidation proportion', view_figure = False)
         
         # define and refine the fitted Hill equation parameters
         increments = [0.01*self.hf.top, -0.00001*self.hf.top, 0.000001*self.hf.top, -0.0000001*self.hf.top, 0.00000001*self.hf.top]
@@ -509,6 +613,7 @@ class PDI():
             nH_change = -0.1*self.hf.nH
             limit = 1-10**-7
 
+        # refine the regression equation of oxidation into plots of log-reduction 
         inactivation_y_values = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
         count = 0
         relative_to_1 = 'greater'
@@ -519,40 +624,24 @@ class PDI():
                 relative_to_1 = 'lesser'
             else:
                 relative_to_1 = 'greater'
-
-        if self.verbose:
-            message = f'The oxidation data was refined into inactivation data after {count} loops'
-            print(message)
-            self.messages.append(message)
                 
-        # create the DataFrame of processed data        
-        log_oxidation = -log10(1-array(oxidation_y_values))
-        log_inactivation = -log10(1-array(inactivation_y_values))
-        log_excitation = -log10(1-array(excitation_y_values))
-        
-        self.processed_data = pandas.DataFrame(index = list(xs))
-        index_label = 'time (hr)'
-        if exposure_axis:
-            index_label = 'exposure (J/cm\N{superscript two})'
-        self.processed_data.index.name = index_label
-        
-        self.processed_data['oxidation'] = oxidation_y_values
         self.processed_data['inactivation'] = inactivation_y_values
-        self.processed_data['excitation'] = excitation_y_values
-        self.processed_data['log-oxidation'] = log_oxidation
-        self.processed_data['log-inactivation'] = log_inactivation
-        self.processed_data['log-excitation'] = log_excitation
+        self.processed_data['log10-inactivation'] = -log10(1-array(inactivation_y_values)) 
         
-        # create the data figure
+        # create the figure
         pyplot.rcParams['figure.figsize'] = (11, 7)
         pyplot.rcParams['figure.dpi'] = 150
         
         self.figure, self.ax = pyplot.subplots()
-        self.ax.plot(xs, log_inactivation, label = 'Inactivation')
+        self.ax.plot(xs, self.processed_data['log10-inactivation'], label = 'Inactivation')
         if display_fa_oxidation:
-            self.ax.plot(xs, log_oxidation, label = 'Oxidation')
+            self.ax.plot(xs, self.processed_data['log10-oxidation'], label = 'Oxidation')
         if display_ps_excitation:
-            self.ax.plot(xs, log_excitation, label = 'Excitation')
+            sec_ax = self.ax.twinx()
+            sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
+            sec_ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
+            sec_ax.set_ylim(0.8,1.05)
+            sec_ax.legend()
             
         self.ax.set_ylabel(y_label)
         self.ax.set_xlabel(index_label)
@@ -560,108 +649,41 @@ class PDI():
             figure_title = 'Cytoplasmic oxidation and inactivation of {} via PDI'.format(self.parameters['bacterial_specie'])
         self.ax.set_title(figure_title)
         self.ax.legend()    
+
+        if self.verbose:
+            message = f'The oxidation data was refined into inactivation data after {count} loops'
+            print(message)
+            self.messages.append(message)
         
-        if export_content:
+        if export_contents:
             self._export(export_name, export_directory)
-        
-    def _export(self, export_name, export_directory):       
-        # define the simulation_path
-        if export_directory is None:
-            export_directory = os.getcwd()
-        elif not os.path.exists(export_directory):
-            error = '--> ERROR: The provided directory does not exist'
-            self.messages.append(error)
-            raise ImportError(error)
-            
-        if export_name is None:
-            export_name = '-'.join([re.sub(' ', '_', str(x)) for x in ['PDIpy', self.parameters['photosensitizer_selection'], self.parameters['bacterial_specie']]])
-            
-        # make the simulation directory
-        count = 0
-        export_path = os.path.join(export_directory, export_name)
-        while os.path.exists(export_path):
-            if not re.search('(-[0-9]+$)', export_path):
-                export_path += f'-{count}'   
-            else:
-                export_path = re.sub('([0-9]+)$', str(count), export_name)
-            count += 1
-        os.mkdir(export_path)
-            
-        # create and export the OMEX file
-        inline_omex = '\n'.join([self.model, self.phrasedml_str])  
-        omex_file_name = 'pdipy_input.omex'
-        tellurium.exportInlineOmex(inline_omex, os.path.join(export_path, omex_file_name))
-        
-        # export the CSVs and regression content
-        self.raw_data.to_csv(os.path.join(export_path, 'raw_data.csv'))
-        self.processed_data.to_csv(os.path.join(export_path, 'processed_data.csv'))
-        if not self.parameters['biofilm']:                                   #!!! Why does the specification of a biofilm simulation significantly influence the ability to export the regression plot?
-            self.hf.export(export_path, 'hillfit-regression')
-        
-        # export the figure
-        self.figure.savefig(os.path.join(export_path, 'inactivation.svg'))
-        if self.verbose:
-            if not self.jupyter:
-                self.figure.show()
-        
-        # define and export tables of parameters and variables
-        self.parameters['simulation_path'] = self.variables['simulation_path'] = export_path
-        parameters = {'parameter':[], 'value':[]}
-        for parameter, value in self.parameters.items():
-            parameters['parameter'].append(parameter)
-            if isnumber(value):
-                parameters['value'].append(sigfigs_conversion(value, 5))
-            else:
-                parameters['value'].append(value)      
-                
-        variables = {'variable':[], 'value':[]}
-        for variable, value in self.variables.items():
-            variables['variable'].append(variable)
-            if isnumber(value):
-                variables['value'].append(sigfigs_conversion(value, 5))
-            else:
-                variables['value'].append(value)
-                
-        parameters_table = pandas.DataFrame(parameters)
-        parameters_table.to_csv(os.path.join(export_path, 'parameters.csv'))
-        
-        variables_table = pandas.DataFrame(variables)   
-        variables_table.to_csv(os.path.join(export_path, 'variables.csv'))
-        
-        if self.verbose:
-            if self.jupyter:
-                display(parameters_table)
-                display(variables_table)
-            else:
-                print(variables_table)     
-                print(parameters_table)
         
     def parse_data(self,
                      log_reduction: float = None, # the specified log_reduction that is achieved at the investigated time
-                     target_time: float = None    # the specified time at which an investigated log_reduction is achieved
+                     target_hours: float = None    # the specified time at which an investigated log_reduction is achieved
                      ):
         value = unit = None
         if isnumber(log_reduction):
-            if log_reduction > self.processed_data['inactivation'].iloc[-1]:
-                message = '--> ERROR: The inquired reduction is never reached.'
+            if log_reduction > self.processed_data['log10-inactivation'].iloc[-1]:
+                message = 'The inquired log-reduction is never reached in the simulation.'
                 raise ValueError(message)
             else:
                 for index, point in self.processed_data.iterrows():
-                    if point['inactivation'] >= log_reduction:
+                    if point['log10-inactivation'] >= log_reduction:
                         value = index
                         unit = 'hours'
                         message = f'{unit} to target: {value}'
                         break
-        elif isnumber(target_time):
-            if target_time > self.processed_data.index[-1]:
+        elif isnumber(target_hours):
+            if target_hours > self.processed_data.index[-1]:
                 message = '--> ERROR: The inquired time is never reached.'
                 raise ValueError(message)
             else:
                 for index, point in self.processed_data.iterrows():
-                    if index >= target_time:
-                        value = point['log-inactivation']
+                    if index >= target_hours:
+                        value = point['log10-inactivation']
                         unit = 'log10-inactivation'
-                        message = '{} at {}: {}'.format(unit, target_time, value)
+                        message = '{} at {} hours: {}'.format(unit, target_hours, value)
                         break
         else:
             message = '--> ERROR: Neither the target_time nor the target_reduction are parameterized as numbers.'

@@ -217,11 +217,15 @@ The processed data can be automatically processed through this function, as a co
 
 .. code-block:: python
 
- pdi.data_parsing(log_reduction = None, target_time = None)
+ value, unit = pdi.data_parsing(log_reduction = None, target_hours = None)
 
 - *log_reduction* ``float``: inquires at what time the specified log-reduction is achieved 
-- *target_time* ``float``: inquires what log-reduction is achieved that the specified time
+- *target_hours* ``float``: inquires what log-reduction is achieved that the specified time
 
+**Returns** *value* ``float``: The value of the search inquiry, reported in the respective units.
+
+**Returns** *unit* ``str``: The units of the search inquiry result, being either log-reduction or hours.
+ 
 ____________
 
 
@@ -254,7 +258,7 @@ The following list highlights stored content in the ``PDI`` object after a simul
 - *bacterium*, *photosensitizer*, & *light* ``dict``: Dictionaries of the simulation parameters for the bacterium, photosensitizer, and light, respectively.
 - *parameters*, *variables*, & *results* ``dict``: Dictionaries that possess the input parameters, calculation variables, and simulation results, respectively.
 - *figure* & *ax* ``MatplotLib.Pyplot.subplots``: The `MatPlotLib objects <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.subplot.html#matplotlib.pyplot.subplot>`_ of the simulation figure, which allows the user to externally manipulate the figure without recreating a new figure from the raw or processed data.
-- *chem_mw* ``ChemMW``: The ``ChemMW`` object from the `ChemW module <https://pypi.org/project/ChemW/>`_, which allows users to calculate the molecular weight from a string of any chemical formula. The formatting specifications are detailed in the README of the ChemW module. 
-- *hf* ``HillFit``: The `HillFit object <https://pypi.org/project/hillfit/>`_ is stored, from which the Hill-equation regrssion parameters, equation string, and R\ :sup:`2`\ of the fitted equation can be programmatically accessed, in addition to being exported with the ``PDIpy`` content through the ``export()`` function.
+- *chem_mw* ``chemw.ChemMW``: The ``ChemMW`` object from the `ChemW module <https://pypi.org/project/ChemW/>`_, which allows users to calculate the molecular weight from a string of any chemical formula. The formatting specifications are detailed in the README of the ChemW module. 
+- *hf* ``hillfit.HillFit``: The ``HillFit`` object from the `Hillfit module <https://pypi.org/project/hillfit/>`_ is stored, from which the Hill-equation regrssion parameters, equation string, and R\ :sup:`2`\ of the fitted equation can be programmatically accessed, in addition to being exported with the ``PDIpy`` content through the ``export()`` function.
 - *bacteria* ``list``: A list of all the predefined bacteria parameter files, from which a user can easily simulate via the ``PDI`` object.
 - *light_parameters*, *photosensitizers*, & *solution* ``dict``: Dictionaries of the predefined options and parameters for the light sources, photosensitizers, and solution dimensions, respectively.

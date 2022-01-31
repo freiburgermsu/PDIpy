@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup, find_packages
 
-with open('README.rst') as file:
+with open('README.rst', 'r', encoding='utf-8') as file:
     readme = file.read()
 
 setup(
@@ -10,7 +10,7 @@ setup(
   packages = find_packages(),
   package_data = {
           'pdipy': ['parameters/*'],
-          'test': ['/*']
+          'test': ['./*']
           }, 
   version = '0.0.2',
   license = 'MIT',
@@ -19,6 +19,24 @@ setup(
   author = 'Andrew Freiburger',               
   author_email = 'andrewfreiburger@gmail.com',
   url = 'https://github.com/freiburgermsu/PDIpy',   
-  keywords = ['antibacterial', 'photodynamic', 'biophysics', 'computational', 'biology', 'medicine', 'PDI', 'antibiotics'],
-  install_requires = ['matplotlib', 'tellurium', 'scipy', 'pandas', 'sigfig', 'hillfit', 'chemw', 'numpy']
+  keywords = [
+          'antibacterial',
+          'photodynamic', 
+          'biophysics',
+          'computational',
+          'biology',
+          'medicine', 
+          'PDI', 
+          'antibiotics'
+          ],
+  install_requires = [
+          'matplotlib',
+          'tellurium', 
+          'scipy', 
+          'pandas',
+          'sigfig',
+          'hillfit',
+          'chemw',
+          'numpy'
+          ]
 )

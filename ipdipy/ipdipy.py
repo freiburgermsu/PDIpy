@@ -12,10 +12,6 @@ import threading
 # import the software
 import pdipy
 pdi = pdipy.PDIBacterialPkg()
-            
-### =====================================================
-### UI CODE BELOW HERE         
-### =====================================================
           
 # interface options
 header_string = ""
