@@ -33,7 +33,7 @@
     },
     "membrane_thickness_nm": {
       "value": 4,
-      "reference": "W.Rawicz, K.C.Olbrich, T.McIntosh, D.Needham, E.Evans (2000). Effect of Chain Length and Unsaturation on Elasticity of Lipid Bilayers. Biophysical Journal, 79(1), 328–339. https://doi.org/10.1016/S0006-3495(00)76295-3"
+      "reference": "W.Rawicz, K.C.Olbrich, T.McIntosh, D.Needham, E.Evans (2000). Effect of Chain Length and Unsaturation on Elasticity of Lipid Bilayers. Biophysical Journal, 79(1), 328–339. https://doi.org/10.1016/S0006-3495(00)76295-3  ; “The electrical capacity of suspensions with special reference to blood” by Fricke, 1925"
     },
     "cell_mass_pg": {
       "value": 1.048,
@@ -50,6 +50,6 @@
   },
   "cellular_dry_mass_proportion_biofilm":{
 	"value": 0.1,
-	"reference": "The biofilm matrix; Flemming et al.; 2010.pdf"
+	"reference": "The biofilm matrix; Flemming et al.; 2010"
   }
 }

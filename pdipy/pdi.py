@@ -52,11 +52,9 @@ def isnumber(num):
 
 class PDI():
     def __init__(self, 
-                 total_time: float,              # The total simulation time
                  solution_dimensions: dict = {}, # defines dimensions of the simulated solution 
                  surface_system: bool = False,   # specifies whether cross-linked photosensitizer will be simulated
                  well_count: str = 24,        # The petri dish well count that will be simulated, which begets default dimensions of the simulated solution
-                 timestep: float = 3,            # The simulation timestep value, which subtly affects the simulation predictions
                  verbose: bool = False,     
                  jupyter: bool = False
                  ):
@@ -81,11 +79,7 @@ class PDI():
         self.bacteria = [re.search('(?<=bacteria\\\\)(.+)(?=\.json)', x).group() for x in glob(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'*.json'))]
         self.light_parameters = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'light_source.json'), encoding = 'utf-8'))
         self.photosensitizers = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'photosensitizers.json'), encoding = 'utf-8'))        
-        
-        # time conditions
-        self.parameters['total_time_s'] = int(total_time * minute)
-        self.parameters['timestep_s'] = timestep * minute
-        
+                
         # define the solution 
         well_count = str(well_count)
         self.solution = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')))[well_count]
@@ -117,10 +111,10 @@ class PDI():
         self.parameters['biofilm'] = biofilm
         
         # load the bacterial parameters
-        self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', 'S_aureus.json')))
+        self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', 'S_aureus.json'),encoding='utf-8'))
         if bacterial_specie in self.bacteria:
             self.parameters['bacterial_specie'] = bacterial_specie
-            self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json')))
+            self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json'),encoding='utf-8'))
         if bacterial_characteristics != {}:
             for key, value in bacterial_characteristics.items():
                 if key == 'name':
@@ -276,9 +270,6 @@ class PDI():
         lumens_per_watt = self.light['lumens_per_watt']['value']
         if 'irradiance' in measurement: # mW / cm^2
             self.parameters['watts'] = (measurement['irradiance']*milli/centi**2) * self.area
-        elif 'exposure' in measurement:  # J / cm^2
-            simulation_time = self.parameters['total_time_s'] * minute
-            self.parameters['watts'] = (measurement['exposure']/centi**2) / simulation_time * self.area
         elif 'lux' in measurement: # lumen / m^2
             self.parameters['watts'] = measurement['lux'] / lumens_per_watt * self.area
         elif 'lumens' in measurement: # lumen
@@ -308,6 +299,14 @@ class PDI():
         self._define_bacterium(bacterial_specie, bacterial_characteristics, bacterial_cfu_ml, biofilm)
         self._define_photosensitizer(photosensitizer, photosensitizer_characteristics, photosensitizer_molar, photosensitizer_g)                         
         self._define_light(light_source, light_characteristics, measurement)
+        
+        # calculate the time conditions of the simulation
+        final_exposure = 10/centi**2  #J/m^2
+        if self.parameters['biofilm']:
+            final_exposure = 70/centi**2 #J/m^2
+        
+        self.parameters['total_time_s'] = int(final_exposure/self.parameters['watts']*self.area)
+        self.parameters['timestep_s'] = 3 * minute
             
     def _singlet_oxygen_calculations(self,):
         # ensure that all prior functions have completed within this instance
@@ -329,7 +328,7 @@ class PDI():
         relative_soret_excitation = 10
         weighted_average_excitation_wavelength = (self.parameters['q_m']['upper'] + self.parameters['soret_m']['lower']*relative_soret_excitation) / (1+relative_soret_excitation)
         joules_per_photon = (h*c) / weighted_average_excitation_wavelength
-        non_reflected_photons = 0.96                   # “SINGLET OXYGEN GENERATION BY PORPHYRINS AND THE PHOTOSENSITIZATION IN LIPOSOMES KINETICS OF 9,lO-DIMETHYLANTHRACENE” by Gross et al., 1993
+        non_reflected_photons = 0.96    
         self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons/N_A * self.parameters['timestep_s']
 
         # singlet oxygen calculations
@@ -358,10 +357,8 @@ class PDI():
         e_fraction = min(
                 1, ((self.variables['photon_moles_per_timestep']*self.variables['volume_proportion']) / (self.variables['photosensitizers']/N_A))
                 )
-        self.variables['e_ps_decay_time_s'] = average(1.5,15)*nano # “Ultrafast excitation transfer and relaxation inlinear and crossed-linear arrays of porphyrins” by Akimoto et al., 1999  ; "Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen" by Küpper et al., 2002
-        k_ps_rlx = 1/self.variables['e_ps_decay_time_s']     
-        self.variables['ps_excitation_s'] = 50*femto # an estimated time that is below the detection limit of femto-second laser spectrophotometers; specific measurements have not been discovered.
-        k_e_ps = 1/self.variables['ps_excitation_s']
+        k_ps_rlx = 1/(self.photosensitizer['ps_decay (ns)']['value']*nano) 
+        k_e_ps = 1/(self.photosensitizer['ps_rise (fs)']['value']*femto )
         qy_e = self.photosensitizer['e_quantum_yield']['value']
         
         photosensitizer = f'{k_e_ps}*{e_fraction}*{qy_e}*ps - {k_ps_rlx}*e_ps'
@@ -372,32 +369,30 @@ class PDI():
         
         # ============== define singlet oxygen generation ==============
         mo = self.variables['dissolved_mo_molar']
-        qy = self.variables['so_qy'] = self.photosensitizer['e_quantum_yield']['value'] * self.photosensitizer['so_specificity']['value'] 
+        qy_so = self.photosensitizer['so_specificity']['value'] 
+        k_so = 1/(self.photosensitizer['ps_charge_transfer (ns)']['value']*nano)
         
-        self.variables['e_ps_charge_transfer_s'] = average(20,)*nano   # “Kinetics and efficiency of excitation energy transfer from chlorophylls, their heavy metal-substituted derivatives, and pheophytins to singlet oxygen” by Küpper et al., 2002 
-        k_so = 1/self.variables['e_ps_charge_transfer_s']
-        
-        lifetime_logcfu_slope = (40-10)/(8-4)               # “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007
+        lifetime_logcfu_slope = (40-10)/(8-4) 
         self.variables['so_decay_time_s'] = max(
-                4, lifetime_logcfu_slope*log10(self.parameters['bacterial_cfu_ml'])
-                )*micro  # a minimum lifetime of 4 microseconds is parameterized for dilute aqueous solution, according to the concensus from literature: e.g. “The role of singlet oxygen and oxygen concentration in photodynamic inactivation of bacteria” by Maisch et al., 2007 
+                3.5, lifetime_logcfu_slope*log10(self.parameters['bacterial_cfu_ml'])
+                )*micro 
         k_rlx_so = 1/self.variables['so_decay_time_s']
         
         # ============== define fatty acid and EPS oxidation ==============
-         # The values are attenuated from this study of unsaturated vegetable oil (10.5650/jos.ess18179), since the bacterial fatty acids are saturated and are not embedded with antioxidants like vitammin E that protects these oils.
-        k_fa = 10**(2+log10(self.parameters['watts']))*2E2
-        if self.parameters['watts'] > 1e-4:
-            k_fa = 4E1  
-            if self.parameters['watts'] > 0.01:
-                k_fa = 7E1 
-                if self.parameters['watts'] > 1:
-                    k_fa = 1.2E2  
+        k_fa = 400 # 10**(2+log10(self.parameters['watts']))*769
+#        if self.parameters['watts'] > 1e-4:
+#            k_fa = 200
+#            if self.parameters['watts'] > 0.01:
+#                k_fa = 500
+#                if self.parameters['watts'] > 1:
+#                    k_fa = 769
                     
         k_fa *= self.variables['fa_gL_conc']
         self.variables['k_fa']  = k_fa
         fa = self.variables['fa_molar']
-        k_fa_reduction = (self.parameters['bacterial_cfu_ml']/1E6)**0.1      # arbitrary reduction, dependent upon the CFU concentration
-        k_fa /= k_fa_reduction
+        if not self.parameters['biofilm']:
+            k_fa_reduction = (self.parameters['bacterial_cfu_ml']/1E6)**0.1      # arbitrary reduction, dependent upon the CFU concentration
+            k_fa /= k_fa_reduction
         
         biofilm = eps = ''
         if self.parameters['biofilm']:
@@ -410,7 +405,7 @@ class PDI():
             # kinetic expressions
             ps -> e_ps; {photosensitizer}
             ps => b_ps ; {k_b_ps}*ps
-            e_ps + mo => so + ps;  {qy}*{k_so}*e_ps*mo
+            e_ps + mo => so + ps;  {qy_so}*{k_so}*e_ps*mo
             so => mo; {k_rlx_so}*so
             so + fa => o_fa; {k_fa}*so*fa
             {biofilm}
@@ -431,8 +426,9 @@ class PDI():
             
           end
         ''')       
-        # ============== SED-ML plot ==============
-        total_points = int(self.parameters['total_time_s'] / self.parameters['timestep_s'])
+        # ============== SED-ML plot ==============        
+#        total_points = int(self.parameters['total_time_s'] / self.parameters['timestep_s'])
+        total_points = 300
         self.phrasedml_str = '''
           model1 = model "pdipy_oxidation"
           sim1 = simulate uniform(0, {}, {})
@@ -578,7 +574,7 @@ class PDI():
         oxidation_ys = []
         excitation_ys = []
         first = True
-        for index, point in self.raw_data.iterrows():      # cytoplasmic oxidation may not be 1:1 correlated with reduction
+        for index, point in self.raw_data.iterrows():   
             if first:                                      # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
                 first = False
                 continue
@@ -586,6 +582,7 @@ class PDI():
             if exposure_axis:  # J/cm^2
                 x_value *= self.parameters['watts']*hour/(self.area/centi**2)
             x_values.append(x_value)
+            
             # calculate the oxidation_proportion of the cytoplasmic fatty acids
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             oxidation_ys.append(oxidation_proportion)
@@ -615,15 +612,16 @@ class PDI():
         self.hf.fitting(x_label = index_label, y_label = 'oxidation proportion', view_figure = False)
         
         # define and refine the fitted Hill equation parameters
-        num_increments = 7+log10(self.parameters['watts'])
+#        num_increments = 7+log10(self.parameters['watts'])
+        num_increments = 8
         increments = logspace(-1,-(num_increments+4),ceil(num_increments))*self.hf.top
         
         top_increment = 0.01*self.hf.top
         ec50_change = -.76*self.hf.ec50
         nH_change = self.hf.nH # +self.parameters['watts']
         
-        limit = 1-10**-(2*self.parameters['watts']-log10(1-oxidation_ys[-1]))
-        print(limit)
+        limit = 1-10**-(self.parameters['watts']**(0.2)-log10(1-oxidation_ys[-1]))
+#        print(limit)         1-10**-8 #
         if self.parameters['biofilm']:
             increments = [0.01*self.hf.top, -0.00001*self.hf.top, 0.000001*self.hf.top]
             top_increment = 0.01*self.hf.top
