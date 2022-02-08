@@ -544,6 +544,7 @@ class PDI():
                  exposure_axis: bool = False,          # signifying exposure on the x-axis instead of time
                  display_fa_oxidation: bool = False,   # optionally overlaying the fatty acid oxidation proportion in the figure  
                  display_ps_excitation: bool = False,
+                 display_inactivation: bool = True,
                  export_contents: bool = True
                  ):
         def asymptote(xs, limit, inactivation_ys, top_increment, top_increment_change, count, relative_to_limit):
@@ -656,25 +657,38 @@ class PDI():
         pyplot.rcParams['figure.dpi'] = 150
         
         self.figure, self.ax = pyplot.subplots()
-        self.ax.plot(xs, self.processed_data['log10-inactivation'], label = 'Inactivation')
+        if display_inactivation:
+            self.ax.plot(xs, self.processed_data['log10-inactivation'], label = 'Inactivation')
         if display_fa_oxidation:
             self.ax.plot(xs, self.processed_data['log10-oxidation'], label = 'Oxidation')
         if display_ps_excitation:
-            sec_ax = self.ax.twinx()
-            sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
-            sec_ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
-            sec_ax.set_ylim(
+            if not display_fa_oxidation and not display_inactivation:
+                self.ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
+                self.ax.set_xlabel(index_label)
+                self.ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
+                self.ax.set_ylim(
                     min(self.processed_data['excitation'])-.05,
                     min(1,max(self.processed_data['excitation']))+.05
                     )
-            sec_ax.legend(loc = 'lower right')
+                self.ax.legend(loc = 'lower right')
+            else:
+                sec_ax = self.ax.twinx()
+                sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
+                sec_ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
+                sec_ax.set_ylim(
+                        min(self.processed_data['excitation'])-.05,
+                        min(1,max(self.processed_data['excitation']))+.05
+                        )
+                sec_ax.legend(loc = 'lower right')
             
-        self.ax.set_ylabel(y_label)
-        self.ax.set_xlabel(index_label)
         if figure_title is None:
             figure_title = 'Cytoplasmic oxidation and inactivation of {} via PDI'.format(self.parameters['bacterial_specie'])
         self.ax.set_title(figure_title)
-        self.ax.legend(loc = 'lower center')    
+        
+        if display_inactivation or display_fa_oxidation:
+            self.ax.set_ylabel(y_label)
+            self.ax.set_xlabel(index_label)
+            self.ax.legend(loc = 'lower center')    
 
         if self.verbose:
             message = f'The oxidation data was refined into inactivation data after {count} loops'
