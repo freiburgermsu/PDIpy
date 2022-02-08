@@ -55,7 +55,8 @@ class PDI():
                  solution_dimensions: dict = {}, # defines dimensions of the simulated solution 
                  surface_system: bool = False,   # specifies whether cross-linked photosensitizer will be simulated
                  well_count: str = 24,        # The petri dish well count that will be simulated, which begets default dimensions of the simulated solution
-                 verbose: bool = False,     
+                 verbose: bool = False,  
+                 printing: bool = True,
                  jupyter: bool = False
                  ):
         # define base organizations
@@ -67,11 +68,13 @@ class PDI():
         self.messages = []
         self.verbose = verbose
         self.jupyter = jupyter
+        self.printing = printing
         self.chem_mw = ChemMW(printing = False)
         
         # initial parameters
         self.parameters['surface_system'] = surface_system
         self.parameters['so_diffusion_m'] = 80 * nano       # Moan1990 
+        self.parameters['timestep_s'] = 3 * minute
 #         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = os.path.dirname(__file__)
         
@@ -170,17 +173,14 @@ class PDI():
         self.photosensitizer = self.photosensitizers['A3B_4Zn']
         if photosensitizer in self.photosensitizers:
             self.parameters['photosensitizer_selection'] = photosensitizer
-            self.photosensitizer = self.photosensitizers[photosensitizer] 
-        else: #if photosensitizer not in self.photosensitizers:
-            error = f'--> ERROR: The photosensitizer {photosensitizer} is neither a predefined option nor a customized dictionary.'
-            self.messages.append(error)
-            raise TypeError(error)    
-            
+            self.photosensitizer = self.photosensitizers[photosensitizer]             
         if photosensitizer_characteristics != {}:
             for key, value in photosensitizer_characteristics.items():
                 if key == 'name':
                     self.parameters['photosensitizer_selection'] = value
                 else:
+                    if key not in self.photosensitizer:
+                        self.photosensitizer[key] = {}
                     for key2, value2 in value.items():
                         self.photosensitizer[key][key2] = value2
                                                        
@@ -301,12 +301,10 @@ class PDI():
         self._define_light(light_source, light_characteristics, measurement)
         
         # calculate the time conditions of the simulation
-        final_exposure = 10/centi**2  #J/m^2
-        if self.parameters['biofilm']:
-            final_exposure = 70/centi**2 #J/m^2
-        
-        self.parameters['total_time_s'] = int(final_exposure/self.parameters['watts']*self.area)
-        self.parameters['timestep_s'] = 3 * minute
+#        final_exposure = 10/centi**2  #J/m^2
+#        if self.parameters['biofilm']:
+#            final_exposure = 70/centi**2 #J/m^2
+#        self.parameters['total_time_s'] = int(final_exposure/self.parameters['watts']*self.area)
             
     def _singlet_oxygen_calculations(self,):
         # ensure that all prior functions have completed within this instance
@@ -333,12 +331,11 @@ class PDI():
 
         # singlet oxygen calculations
         '''ambient_so = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
-        self.variables['dissolved_mo_molar'] = 9*milli*self.chem_mw.mass('O2')    # mg/L -> M, ambient water quality criteria for Dissolved Oxygen, EPA   
 
         if self.verbose:
             messages = [
                     'photons per timestep: ', self.variables['photon_moles_per_timestep'], 
-                    'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar']), 
+#                    'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar']), 
                     'effective excitation watts: ', sigfigs_conversion(effective_excitation_watts)
                     ]
             
@@ -368,7 +365,7 @@ class PDI():
         self.variables['hv_photobleaching_s'] = 1/k_b_ps
         
         # ============== define singlet oxygen generation ==============
-        mo = self.variables['dissolved_mo_molar']
+        mo = 9*milli/self.chem_mw.mass('O2')    # mg/L -> M, ambient water quality criteria for Dissolved Oxygen, EPA   
         qy_so = self.photosensitizer['so_specificity']['value'] 
         k_so = 1/(self.photosensitizer['ps_charge_transfer (ns)']['value']*nano)
         
@@ -379,7 +376,7 @@ class PDI():
         k_rlx_so = 1/self.variables['so_decay_time_s']
         
         # ============== define fatty acid and EPS oxidation ==============
-        k_fa = 400 # 10**(2+log10(self.parameters['watts']))*769
+        k_fa = 769 # 10**(2+log10(self.parameters['watts']))*769
 #        if self.parameters['watts'] > 1e-4:
 #            k_fa = 200
 #            if self.parameters['watts'] > 0.01:
@@ -391,8 +388,8 @@ class PDI():
         self.variables['k_fa']  = k_fa
         fa = self.variables['fa_molar']
         if not self.parameters['biofilm']:
-            k_fa_reduction = (self.parameters['bacterial_cfu_ml']/1E6)**0.1      # arbitrary reduction, dependent upon the CFU concentration
-            k_fa /= k_fa_reduction
+            k_fa_augmentation = (self.parameters['bacterial_cfu_ml']/1E6)**0.3      # empirical factor that considers increasing oxidation rate with greater CFU/mL
+            k_fa *= k_fa_augmentation
         
         biofilm = eps = ''
         if self.parameters['biofilm']:
@@ -407,7 +404,7 @@ class PDI():
             ps => b_ps ; {k_b_ps}*ps
             e_ps + mo => so + ps;  {qy_so}*{k_so}*e_ps*mo
             so => mo; {k_rlx_so}*so
-            so + fa => o_fa; {k_fa}*so*fa
+            so + fa => o_fa + mo; {k_fa}*so*fa
             {biofilm}
 
             # define concentrations
@@ -427,8 +424,8 @@ class PDI():
           end
         ''')       
         # ============== SED-ML plot ==============        
-#        total_points = int(self.parameters['total_time_s'] / self.parameters['timestep_s'])
-        total_points = 300
+        total_points = int(self.parameters['total_time_s'] / (3*minute))
+#        total_points = 300
         self.phrasedml_str = '''
           model1 = model "pdipy_oxidation"
           sim1 = simulate uniform(0, {}, {})
@@ -447,7 +444,7 @@ class PDI():
         self.raw_data.index.name = 'Time (s)'
         
         if self.parameters['biofilm']:
-            self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]', '[oeps]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]', '[eps]', '[oeps]']
         else:
             self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
         
@@ -455,7 +452,7 @@ class PDI():
             messages = [
                     tellurium_model.getCurrentAntimony(), 
                     f'\nCurrent integrator:\n{tellurium_model.integrator}', 
-                    f'k_fa reduction factor:{k_fa_reduction}', ]
+                    ] # f'k_fa augmentation factor:{k_fa_augmentation}', 
             self.messages.extend(messages)
             for message in messages:            
                 print(message)
@@ -539,6 +536,7 @@ class PDI():
                 print(parameters_table)
     
     def simulate(self,
+#                 simulation_time: float = 720,         # minutes
                  export_name: str = None,
                  export_directory: str = None,
                  figure_title: str = None,             # the figure title
@@ -566,6 +564,8 @@ class PDI():
             return count, inactivation_ys, top_increment
         
         # calculate the kinetics of the simulation 
+        simulation_time = 720
+        self.parameters['total_time_s'] = simulation_time*minute
         self._singlet_oxygen_calculations()
         self._kinetic_calculation()
                     
@@ -578,14 +578,16 @@ class PDI():
             if first:                                      # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
                 first = False
                 continue
+            # calculate the oxidation_proportion of the cytoplasmic fatty acids
+            oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
+            if oxidation_proportion > 1:
+                break
+            oxidation_ys.append(oxidation_proportion)
+            
             x_value = index/hour
             if exposure_axis:  # J/cm^2
                 x_value *= self.parameters['watts']*hour/(self.area/centi**2)
             x_values.append(x_value)
-            
-            # calculate the oxidation_proportion of the cytoplasmic fatty acids
-            oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
-            oxidation_ys.append(oxidation_proportion)
             
             # calculate the PS excitation proportion 
             excitation_proportion = point['[e_ps]'] / (point['[ps]'] + point['[e_ps]'] + point['[b_ps]'])
@@ -612,6 +614,10 @@ class PDI():
         self.hf.fitting(x_label = index_label, y_label = 'oxidation proportion', view_figure = False)
         
         # define and refine the fitted Hill equation parameters
+        for y in reversed(oxidation_ys):
+            if y<1:
+                final_y = y
+                break
 #        num_increments = 7+log10(self.parameters['watts'])
         num_increments = 8
         increments = logspace(-1,-(num_increments+4),ceil(num_increments))*self.hf.top
@@ -620,7 +626,7 @@ class PDI():
         ec50_change = -.76*self.hf.ec50
         nH_change = self.hf.nH # +self.parameters['watts']
         
-        limit = 1-10**-(self.parameters['watts']**(0.2)-log10(1-oxidation_ys[-1]))
+        limit = 1-10**-(self.parameters['watts']**(0.2)-log10(1-final_y))
 #        print(limit)         1-10**-8 #
         if self.parameters['biofilm']:
             increments = [0.01*self.hf.top, -0.00001*self.hf.top, 0.000001*self.hf.top]
@@ -635,7 +641,8 @@ class PDI():
         relative_to_limit = 'greater'
         for top_increment_change in increments:
             count, inactivation_ys, top_increment = asymptote(xs, limit, inactivation_ys, top_increment, top_increment_change, count, relative_to_limit)
-            print('refinement loop: ', count)
+            if self.printing:
+                print('refinement loop: ', count)
             if relative_to_limit == 'greater':
                 relative_to_limit = 'lesser'
             else:
@@ -656,7 +663,10 @@ class PDI():
             sec_ax = self.ax.twinx()
             sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
             sec_ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
-            sec_ax.set_ylim(0,1.05)
+            sec_ax.set_ylim(
+                    min(self.processed_data['excitation'])-.05,
+                    min(1,max(self.processed_data['excitation']))+.05
+                    )
             sec_ax.legend(loc = 'lower right')
             
         self.ax.set_ylabel(y_label)
