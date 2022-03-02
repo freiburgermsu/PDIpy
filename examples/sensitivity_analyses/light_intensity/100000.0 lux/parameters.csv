@@ -1,0 +1,20 @@
+,parameter,value
+0,surface_system,False
+1,so_diffusion_m,8.0000E-8
+2,timestep_s,1.8000E2
+3,root_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\pdipy
+4,solution_depth_m,1.2670E-2
+5,solution_sqr_m,1.9300E-4
+6,solution_cub_m,2.4453E-6
+7,bacterial_cfu_ml,1.0000E5
+8,biofilm,False
+9,bacterial_specie,S_aureus
+10,photosensitizer_selection,A3B_4Zn
+11,soret_m,"{'upper': 4.3e-07, 'lower': 4.0000000000000003e-07}"
+12,q_m,"{'upper': 6.25e-07, 'lower': 5.3e-07}"
+13,excitation_range_m,2.2500E-7
+14,visible_m,"[3.9e-07, 7.8e-07]"
+15,light_source,LED
+16,watts,1.1353E0
+17,total_time_s,4.3200E4
+18,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\sensitivity_analyses\light_intensity\100000.0 lux

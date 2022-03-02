@@ -1,17 +1,15 @@
 ,variable,value
-0,simulation_path,"C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\Beirao_et_al\Beirao_et_al, 20 uM solution"
-1,fa_g/L_conc,8.4772E-1
-2,fa_molar,6.9030E-3
-3,photosensitizer_molar,2.0000E-5
-4,photosensitizers,2.9452E16
-5,molecular_volume (m^3),1.2612E-28
-6,volume_proportion,1.5191E-6
-7,photon_moles_per_timestep,2.6205E-6
-8,dissolved_mo_molar,2.8126E-4
-9,e_ps_decay_time (s),8.2500E-9
-10,ps_excitation (s),5.0000E-14
-11,hv_photobleaching (s),1.4368E9
-12,so_qy,4.8000E-1
-13,e_ps_charge_transfer (s),2.0000E-8
-14,so_decay_time (s),6.0000E-5
-15,k_fa,6.5190E2
+0,fa_gL_conc,9.1352E-1
+1,fa_molar,1.0976E-2
+2,cell_radius_m,6.0676E-5
+3,membrane_cub_m,1.8504E-16
+4,fa_mass_proportion,1.6130E-28
+5,photosensitizer_molar,2.0000E-5
+6,photosensitizers,2.9452002043671196e+16
+7,molecular_volume_cub_m,1.2674E-27
+8,volume_proportion,1.5265E-5
+9,photon_moles_per_timestep,2.6205E-6
+10,hv_photobleaching_s,4.1667E-1
+11,so_decay_time_s,6.0000E-5
+12,k_fa,7.0250E2
+13,simulation_path,"C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\Beirao_et_al\Beirao_et_al, 20 uM solution"

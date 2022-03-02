@@ -12,15 +12,13 @@
 			"value": "C76_H48_N16_F12_Zn",
 			"reference": null
 		},
-		"soret_nm": {
-			"value": [ 400, 430 ],
+		"excitation_nm": {
+			"value": [
+				[400, 430],
+				[530, 625]
+				 ],
 			"reference": null
 		},
-		"q_nm": {
-			"value": [ 530, 625 ],
-			"reference": null
-		},
-		"charge": 4,
 		"ps_decay (ns)": {
     		    "value": 1.5,
     		    "reference": "Akimoto et al., 1999, 'Ultrafast ... Porphyrins'"
@@ -33,10 +31,10 @@
     		    "value": 100,
     		    "reference": "Kupper et al., 2002, 'Kinetics ... Oxygen'" 
 		},
-		"photobleaching_constant (cm^2/J)": {
-			"value": 1.5e-4,
-			"reference": "\"Photobleaching of 5,10,15,20-tetrakis(m-hydroxyphenyl)porphyrin (m-THPP) and the corresponding chlorin (m-THPC) and bacteriochlorin (m-THPBC). A comparative study\" by Bonnett et al., 1999"
-			},
+		"photobleaching_constant (cm2/(J*M))": {
+			"value": 600,
+			"reference": "Dysart et al., 2005, 'Calculation of Singlet Oxygen Dose ... and Photobleaching During mTHPC Photodynamic Therapy of MLL Cells'"
+		},
 		"dimensions": {
 			"shape": "disc",
 			"length_A": 32.8,

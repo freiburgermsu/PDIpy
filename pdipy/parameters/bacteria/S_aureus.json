@@ -1,6 +1,6 @@
 {
     "membrane_chemicals": {
-      "BCFA": {
+      "BC_SFA": {
         "density_gL": {
           "value": 0.9,
           "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density", "https://pubchem.ncbi.nlm.nih.gov/compound/445639"],
@@ -13,7 +13,7 @@
 	  "notes": "All BCFAs were summed from Table 2 for all S. aureus entries."
 	}
       },
-      "SCFA": {
+      "SC_SFA": {
         "density_gL": {
           "value": 0.94,
           "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density"],
@@ -22,6 +22,19 @@
         "formula": ["C20_H38_O2","C18_H34_O2","C16_H30_O2"],
 	"proportion": {
 	  "value": 0.268,
+	  "reference": "A. G. O’DONNELL, M. R. NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V. HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
+	  "notes": "All saturated SCFAs were summed from Table 2 for all S. aureus entries."
+    	}
+      },
+      "SC_UFA": {
+        "density_gL": {
+          "value": 0.94,
+          "reference": ["https://pubchem.ncbi.nlm.nih.gov/compound/Stearic-acid#section=Density"],
+	  "notes": "The density for all saturated fatty acids is estimated as stearic acid."
+        },
+        "formula": ["C20_H38_O2","C18_H34_O2","C16_H30_O2"],
+	"proportion": {
+	  "value": 0.07,
 	  "reference": "A. G. O’DONNELL, M. R. NAHAIE, M. GOODFELLOW, D. E. MINNIKINI, and V. HAJEK. Numerical Analysis of Fatty Acid Profiles in the Identification of Staphylococci. Journal of General Microbiology (1989). 131, 2023-2033. https://doi.org/10.1099/00221287-131-8-2023",
 	  "notes": "All saturated SCFAs were summed from Table 2 for all S. aureus entries."
 	}
@@ -44,7 +57,7 @@
       "reference":  "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
   },
   "eps_oxidation_rate_constant":{
-	"value": 1,
+	"value": 37.75,
 	"reference": null,
 	"notes": "This rate constant was empirically determined after calibrating the predictions with the Beirao et al., 2014 paper that constituted one of our examples"
   },

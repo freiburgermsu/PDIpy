@@ -2,26 +2,31 @@
 	"6": {
 		"area_sqr_cm": 9.60,
 		"depth_cm": 1.771,
-		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+		"extinction_coefficient (1/m)":0.013,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf ; Lorenzen, 1972"
 	},
 	"12": {
 		"area_sqr_cm": 3.85,
 		"depth_cm": 1.766,
-		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+		"extinction_coefficient (1/m)":0.013,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf ; Lorenzen, 1972"
 	},
 	"24": {
 		"area_sqr_cm": 1.93,
 		"depth_cm": 1.81,
-		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+		"extinction_coefficient (1/m)":0.013,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf ; Lorenzen, 1972"
 	},
 	"48": {
 		"area_sqr_cm": 0.84,
 		"depth_cm": 1.845,
-		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+		"extinction_coefficient (1/m)":0.013,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf ; Lorenzen, 1972"
 	},
 	"96": {
 		"area_sqr_cm": 0.33,
 		"depth_cm": 1.182,
-		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf"
+		"extinction_coefficient (1/m)":0.013,
+		"reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf ; Lorenzen, 1972"
 	}
 }

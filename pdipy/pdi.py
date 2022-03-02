@@ -3,6 +3,7 @@ from math import pi, cos, ceil
 from numpy import array, log10, diff, logspace
 from matplotlib import pyplot
 from hillfit import HillFit
+from pprint import pprint
 from sigfig import round
 from glob import glob
 from chemw import ChemMW
@@ -86,12 +87,14 @@ class PDI():
         # define the solution 
         well_count = str(well_count)
         self.solution = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')))[well_count]
+        
+        operational_depth = 0.7  # proportion of well volume that is filled with solution
+        self.solution['depth_cm'] = self.solution['depth_cm']*operational_depth
         if solution_dimensions != {}:
             for key, value in solution_dimensions.items():
                 self.solution[key] = value
             
-        operational_depth = 0.7  # proportion of well volume that is filled with solution
-        self.parameters['solution_depth_m'] = self.solution['depth_cm']*operational_depth*centi
+        self.parameters['solution_depth_m'] = self.solution['depth_cm']*centi
         self.parameters['solution_sqr_m'] = self.solution['area_sqr_cm']*centi**2
         self.parameters['solution_cub_m'] = self.parameters['solution_depth_m']*self.parameters['solution_sqr_m']
             
@@ -158,7 +161,6 @@ class PDI():
                                photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
                                photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
                                cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
-                               # molecular_proportion: float = None     #!!! What is the purpose or intention of this argument?
                                ):
         def cylinder_volume(radius, height):
             return (radius**2)*pi*height
@@ -185,12 +187,14 @@ class PDI():
                         self.photosensitizer[key][key2] = value2
                                                        
         # classify the photonic absorption characteristics of the photosensitizer
-        upper_soret = self.photosensitizer['soret_nm']['value'][1]*nano
-        lower_soret = self.photosensitizer['soret_nm']['value'][0]*nano
-        upper_q = self.photosensitizer['q_nm']['value'][1]*nano
-        lower_q = self.photosensitizer['q_nm']['value'][0]*nano
-        self.parameters['soret_m'] = {'upper': upper_soret, 'lower': lower_soret}
-        self.parameters['q_m'] = {'upper': upper_q, 'lower': lower_q}
+        self.parameters['soret_m'] = {
+                'upper': self.photosensitizer['excitation_nm']['value'][0][1]*nano, 
+                'lower': self.photosensitizer['excitation_nm']['value'][0][0]*nano
+                }
+        self.parameters['q_m'] = {
+                'upper': self.photosensitizer['excitation_nm']['value'][1][1]*nano, 
+                'lower': self.photosensitizer['excitation_nm']['value'][1][0]*nano
+                }
         self.parameters['excitation_range_m'] = self.parameters['q_m']['upper'] - self.parameters['soret_m']['lower']
 
         # calculate physical dimensions of the photosensitizer
@@ -327,7 +331,8 @@ class PDI():
         weighted_average_excitation_wavelength = (self.parameters['q_m']['upper'] + self.parameters['soret_m']['lower']*relative_soret_excitation) / (1+relative_soret_excitation)
         joules_per_photon = (h*c) / weighted_average_excitation_wavelength
         non_reflected_photons = 0.96    
-        self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons/N_A * self.parameters['timestep_s']
+        non_scattered_photons = e**(-self.solution['extinction_coefficient (1/m)']*self.parameters['solution_depth_m'])
+        self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons*non_scattered_photons/N_A * self.parameters['timestep_s']
 
         # singlet oxygen calculations
         '''ambient_so = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
@@ -349,24 +354,31 @@ class PDI():
             self.variables['bacterial_biofilm_mass_proportion'] = self.bacterium['cellular_dry_mass_proportion_biofilm']['value']
         
     def _kinetic_calculation(self,):      
+        if ('so_specificity' and 'e_quantum_yield') in self.photosensitizer:
+            so_conversion = self.photosensitizer['so_specificity']['value'] 
+            qy_e = self.photosensitizer['e_quantum_yield']['value']    
+        elif 'so_quantum_yield' in self.photosensitizer:
+            so_conversion = qy_e = self.photosensitizer['so_quantum_yield']**0.5
+        else:
+            message = 'Either the so_quantum_yield or the e_quantum_yield and the so_specificity quantum yields must be defined for the parameterized PS.'
+            self.messages.append(message)
+            raise ValueError(message)
+            
         # ========== define photosensitizer excitation ===========
         ps = self.variables['photosensitizer_molar']
         e_fraction = min(
                 1, ((self.variables['photon_moles_per_timestep']*self.variables['volume_proportion']) / (self.variables['photosensitizers']/N_A))
                 )
-        k_ps_rlx = 1/(self.photosensitizer['ps_decay (ns)']['value']*nano) 
-        k_e_ps = 1/(self.photosensitizer['ps_rise (fs)']['value']*femto )
-        qy_e = self.photosensitizer['e_quantum_yield']['value']
-        
+        k_ps_rlx = 1/(self.photosensitizer['ps_decay (ns)']['value']*nano)
+        k_e_ps = 1/(self.photosensitizer['ps_rise (fs)']['value']*femto)
         photosensitizer = f'{k_e_ps}*{e_fraction}*{qy_e}*ps - {k_ps_rlx}*e_ps'
             
         # ============== define photobleaching ==============
-        k_b_ps = self.photosensitizer['photobleaching_constant (cm^2/J)']['value'] * (self.parameters['watts']/(self.area/centi**2))
+        k_b_ps = self.photosensitizer['photobleaching_constant (cm2/(J*M))']['value'] * (self.parameters['watts']/(self.area/centi**2))
         self.variables['hv_photobleaching_s'] = 1/k_b_ps
         
         # ============== define singlet oxygen generation ==============
         mo = 9*milli/self.chem_mw.mass('O2')    # mg/L -> M, ambient water quality criteria for Dissolved Oxygen, EPA   
-        qy_so = self.photosensitizer['so_specificity']['value'] 
         k_so = 1/(self.photosensitizer['ps_charge_transfer (ns)']['value']*nano)
         
         lifetime_logcfu_slope = (40-10)/(8-4) 
@@ -376,14 +388,9 @@ class PDI():
         k_rlx_so = 1/self.variables['so_decay_time_s']
         
         # ============== define fatty acid and EPS oxidation ==============
-        k_fa = 769 # 10**(2+log10(self.parameters['watts']))*769
-#        if self.parameters['watts'] > 1e-4:
-#            k_fa = 200
-#            if self.parameters['watts'] > 0.01:
-#                k_fa = 500
-#                if self.parameters['watts'] > 1:
-#                    k_fa = 769
-                    
+        #!!! TODO: Define a reaction that generates organic matter, with a kinetic rate constant that is the inverse of the doubling time for the simulated organism. The Hill parameters will need to re-adjusted after this inhibition of the PDI process.
+        
+        k_fa = 769                   
         k_fa *= self.variables['fa_gL_conc']
         self.variables['k_fa']  = k_fa
         fa = self.variables['fa_molar']
@@ -394,15 +401,15 @@ class PDI():
         biofilm = eps = ''
         if self.parameters['biofilm']:
             biofilm = 'so + eps => o_eps + mo; {}*so*eps'.format(self.variables['eps_oxidation'])            
-            eps = 'eps = {}'.format((fa/self.variables['fa_mass_proportion'])/self.bacterium['cellular_dry_mass_proportion_biofilm']['value'])
+            eps = 'eps = {}'.format((fa/self.variables['fa_mass_proportion'])/self.bacterium['cellular_dry_mass_proportion_biofilm']['value']/N_A)
 
         # ============== SBML kinetic model ==============
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
             ps -> e_ps; {photosensitizer}
-            ps => b_ps ; {k_b_ps}*ps
-            e_ps + mo => so + ps;  {qy_so}*{k_so}*e_ps*mo
+            e_ps + mo => so + ps;  {so_conversion}*{k_so}*e_ps*mo
+            ps + so => b_ps ; {k_b_ps}*ps*so
             so => mo; {k_rlx_so}*so
             so + fa => o_fa + mo; {k_fa}*so*fa
             {biofilm}
@@ -444,9 +451,9 @@ class PDI():
         self.raw_data.index.name = 'Time (s)'
         
         if self.parameters['biofilm']:
-            self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]', '[eps]', '[oeps]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[mo]', '[so]', '[b_ps]', '[fa]', '[ofa]', '[eps]', '[oeps]']
         else:
-            self.raw_data.columns = ['[ps]', '[e_ps]', '[b_ps]', '[mo]', '[so]', '[fa]', '[ofa]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[mo]', '[so]', '[b_ps]', '[fa]', '[ofa]']
         
         if self.verbose:
             messages = [
@@ -494,8 +501,7 @@ class PDI():
         # export the CSVs and regression content
         self.raw_data.to_csv(os.path.join(self.paths['export_path'], 'raw_data.csv'))
         self.processed_data.to_csv(os.path.join(self.paths['export_path'], 'processed_data.csv'))
-        if not self.parameters['biofilm']:                                   #!!! Why does the specification of a biofilm simulation significantly influence the ability to export the regression plot?
-            self.hf.export(self.paths['export_path'], 'hillfit-regression')
+        self.hf.export(self.paths['export_path'], 'hillfit-regression')
         
         # export the figure
         self.figure.savefig(os.path.join(self.paths['export_path'], 'inactivation.svg'))
@@ -536,7 +542,6 @@ class PDI():
                 print(parameters_table)
     
     def simulate(self,
-#                 simulation_time: float = 720,         # minutes
                  export_name: str = None,
                  export_directory: str = None,
                  figure_title: str = None,             # the figure title
@@ -628,13 +633,11 @@ class PDI():
         nH_change = self.hf.nH # +self.parameters['watts']
         
         limit = 1-10**-(self.parameters['watts']**(0.2)-log10(1-final_y))
-#        print(limit)         1-10**-8 #
         if self.parameters['biofilm']:
-            increments = [0.01*self.hf.top, -0.00001*self.hf.top, 0.000001*self.hf.top]
             top_increment = 0.01*self.hf.top
-            ec50_change = -.8*self.hf.ec50
-            nH_change = -0.1*self.hf.nH
-            limit = 1-10**-7
+            ec50_change = -.65*self.hf.ec50
+            nH_change = 1.2*self.hf.nH
+            limit = 1-10**-(0.7+self.parameters['watts']**(0.2)-log10(1-final_y))
 
         # refine the regression equation of oxidation into plots of log-reduction 
         inactivation_ys = list(eval(f'{self.hf.bottom} + ({self.hf.top}-{top_increment}-{self.hf.bottom})*xs**({self.hf.nH}+{nH_change}) / (({self.hf.ec50}+{ec50_change})**({self.hf.nH}+{nH_change}) + xs**({self.hf.nH}+{nH_change}))'))
@@ -663,7 +666,7 @@ class PDI():
             self.ax.plot(xs, self.processed_data['log10-oxidation'], label = 'Oxidation')
         if display_ps_excitation:
             if not display_fa_oxidation and not display_inactivation:
-                self.ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
+                self.ax.set_ylabel('Photosensitizer excitation proportion')
                 self.ax.set_xlabel(index_label)
                 self.ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
                 self.ax.set_ylim(
