@@ -1,5 +1,5 @@
 from scipy.constants import femto, pico, angstrom, nano, micro, milli, centi, liter, N_A, h, c, minute, hour
-from math import pi, cos, ceil
+from math import pi, cos, ceil, exp
 from numpy import array, log10, diff, logspace
 from matplotlib import pyplot
 from hillfit import HillFit
@@ -331,7 +331,7 @@ class PDI():
         weighted_average_excitation_wavelength = (self.parameters['q_m']['upper'] + self.parameters['soret_m']['lower']*relative_soret_excitation) / (1+relative_soret_excitation)
         joules_per_photon = (h*c) / weighted_average_excitation_wavelength
         non_reflected_photons = 0.96    
-        non_scattered_photons = e**(-self.solution['extinction_coefficient (1/m)']*self.parameters['solution_depth_m'])
+        non_scattered_photons = exp(-self.solution['extinction_coefficient (1/m)']*self.parameters['solution_depth_m'])
         self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons*non_scattered_photons/N_A * self.parameters['timestep_s']
 
         # singlet oxygen calculations
@@ -463,12 +463,7 @@ class PDI():
             self.messages.extend(messages)
             for message in messages:            
                 print(message)
-            
-            if self.jupyter:
-                display(self.raw_data)
-            else:
-                print(self.raw_data)
-                
+                           
     def _export(self, export_name, export_directory):       
         # define the simulation_path
         if export_directory is None:
@@ -505,9 +500,6 @@ class PDI():
         
         # export the figure
         self.figure.savefig(os.path.join(self.paths['export_path'], 'inactivation.svg'))
-        if self.verbose:
-            if not self.jupyter:
-                self.figure.show()
         
         # define and export tables of parameters and variables
         self.parameters['simulation_path'] = self.variables['simulation_path'] = self.paths['export_path']
@@ -533,14 +525,14 @@ class PDI():
         variables_table = pandas.DataFrame(variables)   
         variables_table.to_csv(os.path.join(self.paths['export_path'], 'variables.csv'))
         
-        if self.verbose:
+        if self.printing:
             if self.jupyter:
                 display(parameters_table)
                 display(variables_table)
             else:
                 print(variables_table)     
                 print(parameters_table)
-    
+                   
     def simulate(self,
                  export_name: str = None,
                  export_directory: str = None,
@@ -697,6 +689,18 @@ class PDI():
             message = f'The oxidation data was refined into inactivation data after {count} loops'
             print(message)
             self.messages.append(message)
+            
+            if self.jupyter:
+                display(self.raw_data)
+            else:
+                print(self.raw_data)
+                self.figure.show()
+                
+        if self.printing:
+            if self.jupyter:
+                display(self.processed_data)
+            else:
+                print(self.processed_data)    
         
         if export_contents:
             self._export(export_name, export_directory)

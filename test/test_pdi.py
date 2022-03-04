@@ -48,14 +48,14 @@ def isnumber(num):
 
 def test_init():
     # define the PDI instance
-    pdi = PDI(total_time = 300)
+    pdi = PDI()
     
     # assert the presence of content
     for bol in ['surface_system', ]:
         assert type(pdi.parameters[bol]) is bool 
     for dic in [pdi.light_parameters, pdi.photosensitizers, pdi.defined_model]:
         assert type(dic) is dict
-    for quant in ['so_diffusion_m', 'total_time_s', 'timestep_s', 'solution_depth_m', 'solution_sqr_m', 'solution_cub_m']:
+    for quant in ['so_diffusion_m', 'solution_depth_m', 'solution_sqr_m', 'solution_cub_m']:
         assert isnumber(pdi.parameters[quant])
         
     assert type(pdi.bacteria) is list
@@ -63,7 +63,7 @@ def test_init():
     
 def test_define_conditions():
     # define the PDI conditions
-    pdi = PDI(total_time = 300)
+    pdi = PDI()
     pdi.define_conditions('S_aureus', bacterial_characteristics, 1e5, False, 'A3B_4Zn', photosensitizer_characteristics, 18e-9, False, False, 'LED', light_characteristics, {'irradiance':8})
     
     # assert qualities of the simulation
@@ -125,7 +125,7 @@ def test_define_conditions():
         
 def test_simulate():            
     # execute the simulation
-    pdi = PDI(total_time = 300)
+    pdi = PDI()
     pdi.define_conditions('S_aureus', bacterial_characteristics, 1e5, False, 'A3B_4Zn', photosensitizer_characteristics, 18e-9, False, False, 'LED', light_characteristics, {'irradiance':8})
     pdi.simulate('test-PDIpy', exposure_axis = True, display_fa_oxidation = True, display_ps_excitation = True)
     
@@ -154,15 +154,33 @@ def test_simulate():
         
 def test_parse_data():
     # execute the simulation
-    pdi = PDI(total_time = 300)
-    pdi.define_conditions('S_aureus', bacterial_characteristics, 1e5, False, 'A3B_4Zn', photosensitizer_characteristics, 18e-9, False, False, 'LED', light_characteristics, {'irradiance':8})
-    pdi.simulate('test-PDIpy', exposure_axis = True, display_fa_oxidation = True, display_ps_excitation = True, export_contents = False)
+    pdi = PDI(printing = False)
+    pdi.define_conditions(
+        bacterial_specie = 'S_aureus',
+        bacterial_characteristics = bacterial_characteristics, 
+        bacterial_cfu_ml = 1e7,
+        biofilm = False,
+        photosensitizer = 'A3B_4Zn',
+        photosensitizer_characteristics = photosensitizer_characteristics,
+        photosensitizer_molar = 18e-7,
+        photosensitizer_g = False,
+        cross_linked_sqr_m = False,
+        light_source = 'LED', 
+        light_characteristics = light_characteristics,
+        measurement = {'irradiance':8}
+    )
+    pdi.simulate(
+        export_name = 'test-PDIpy',
+        display_fa_oxidation = True,
+        display_ps_excitation = True,
+        export_contents = False
+    )
     
     # assert that the parsed values are expected
     value, unit = pdi.parse_data(log_reduction = 4)
-    assert round(value, 4) == 2.909
+    assert round(value, 4) == 2.310
     assert unit == 'hours'
     
     value, unit = pdi.parse_data(target_hours = 6)
-    assert round(value, 4) == 6.773
+    assert round(value, 4) == 5.361
     assert unit == 'log10-inactivation'

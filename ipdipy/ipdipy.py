@@ -11,7 +11,7 @@ import threading
 
 # import the software
 import pdipy
-pdi = pdipy.PDIBacterialPkg()
+pdi = pdipy.PDI()
           
 # interface options
 header_string = ""
