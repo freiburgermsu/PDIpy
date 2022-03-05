@@ -1,4 +1,4 @@
-DIpy API
+PDIpy API
 --------------
 
 ++++++++++++++++++++++
@@ -10,7 +10,7 @@ pdipy is installed in a command prompt, Powershell, Terminal, or Anaconda Comman
  pip install pdipy
 
 ++++++++++++++++++++++
-__init__()
+PDI()
 ++++++++++++++++++++++
 
 The simulation environment is defined:
@@ -29,7 +29,7 @@ The simulation environment is defined:
 - *verbose* ``bool``: specifies whether simulation details and calculated values will be printed. This is valuable for troubleshooting.
 - *jupyter* ``bool``: specifies whether the simulation is being conducted in a Jupyter Notebook, which allows ``display()`` to illustrate data tables and figures.
 
-++++++++++++++++++++++
+
 define_conditions()
 ++++++++++++++++++++++
 
@@ -145,7 +145,6 @@ The ``value`` sub-key in the dictionary substructures, where it is present, is t
 where the ``value`` sub-key in the dictionary substructures is the only necessary sub-key for each parameter.
 
 
-++++++++++++++++++++++
 simulate()
 ++++++++++++++++++++++
 
@@ -163,7 +162,6 @@ The aforementioned system specifications are refined into chemical parameters an
 - *display_fa_oxidation* & *display_ps_excitation* ``bool``: determine whether the fatty acid oxidation or the photosensitizer excitation proportions, respectively, will be plotted with the reduction data.
 - *export_content* ``bool``: specifies whether the simulation content will be exported.
 
-++++++++++++++++++++++
 parse_data()
 ++++++++++++++++++++++
 
