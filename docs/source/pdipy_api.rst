@@ -2,14 +2,6 @@ PDIpy API
 --------------
 
 ++++++++++++++++++++++
-Installation
-++++++++++++++++++++++
-
-pdipy is installed in a command prompt, Powershell, Terminal, or Anaconda Command Prompt via ``pip``::
-
- pip install pdipy
-
-++++++++++++++++++++++
 PDI()
 ++++++++++++++++++++++
 
@@ -182,7 +174,7 @@ ____________
 
 
 Accessible content
-----------------------
+++++++++++++++++++++++
 
 Numerous entities are stored within the ``PDI`` object, and can be subsequently used in a workflow. The complete list of content within the ``PDI`` object can be identified and printed through the built-in ``dir()`` function in the following example sequence:
 

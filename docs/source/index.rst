@@ -27,6 +27,15 @@ Antibiotic resistance is developing medical crisis that is projected to surpass 
 .. note::
 
    This project is under active development.
+
+
+++++++++++++++++++++++
+Installation
+++++++++++++++++++++++
+
+pdipy is installed in a command prompt, Powershell, Terminal, or Anaconda Command Prompt via ``pip``::
+
+ pip install pdipy
    
    
 
