@@ -28,7 +28,7 @@ def average(num_1, num_2 = None):
         summation = total = 0
         for num in num_1:
             if num is not None:
-                summation += num
+                summation += float(num)
                 total += 1
         if total > 0:
             return summation/total
@@ -81,7 +81,7 @@ class PDI():
         
         # identify options
         self.bacteria = [re.search('(?<=bacteria\\\\)(.+)(?=\.json)', x).group() for x in glob(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'*.json'))]
-        self.light_parameters = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'light_source.json'), encoding = 'utf-8'))
+        self.light_parameters = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'light.json'), encoding = 'utf-8'))
         self.photosensitizers = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'photosensitizers.json'), encoding = 'utf-8'))        
                 
         # define the solution 
@@ -158,6 +158,8 @@ class PDI():
     def _define_photosensitizer(self, 
                                photosensitizer: str = 'A3B_4Zn',     # specify which photosensitizer from the predefined options will be simulated
                                photosensitizer_characteristics: dict = {},   # Custom specifications of the simulation photosensitizer, which can be used to refine the parameterized photosensitizer
+                               absorption: dict = {},    # specify the absorbance of each wavelength for the simulated PS system
+                               transmittance: dict = {}, # specify the transmittance of each wavelength for the simulated PS system
                                photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
                                photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
                                cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
@@ -166,6 +168,8 @@ class PDI():
             return (radius**2)*pi*height
         
         # define the photosensitizing surface
+        self.absorption = absorption
+        self.transmittance = transmittance
         self.area = self.parameters['solution_sqr_m']
         if self.parameters['surface_system']:            
             self.area = self.parameters['cross_linked_surface_sqr_m'] = cross_linked_sqr_m
@@ -196,14 +200,46 @@ class PDI():
                 'lower': self.photosensitizer['excitation_nm']['value'][1][0]*nano
                 }
         self.parameters['excitation_range_m'] = self.parameters['q_m']['upper'] - self.parameters['soret_m']['lower']
+        
+        self.relative_soret_excitation = 9
+        soret_spectra = []
+        q_spectra = []
+        if self.absorption or self.transmittance != {}:
+            if self.absorbance != {}:
+                for key, val in self.absorbance.items():
+                    if self.parameters['soret_m']['lower'] <= key <= self.parameters['soret_m']['upper']:
+                        soret_spectra.append(val)
+                    elif self.parameters['q_m']['lower'] <= key <= self.parameters['soret_m']['q_m']:
+                        q_spectra.append(val)
+                average_absorbance = (self.relative_soret_excitation/10)*average(soret_spectra)+ (10-self.relative_soret_excitation)/10*average(q_spectra)
+                self.collided_photons_fraction = 1-10**(-average_absorbance)
+            elif self.transmittance != {}:
+                for key, val in self.transmittance.items():
+                    if self.parameters['soret_m']['lower'] <= key <= self.parameters['soret_m']['upper']:
+                        soret_spectra.append(val)
+                    elif self.parameters['q_m']['lower'] <= key <= self.parameters['soret_m']['q_m']:
+                        q_spectra.append(val)
+                average_absorbance = (self.relative_soret_excitation/10)*average(soret_spectra)+ (10-self.relative_soret_excitation)/10*average(q_spectra)        
+                self.collided_photons_fraction = 1-average(average_absorbance)
+        else:
+            # calculate physical dimensions of the photosensitizer
+            photosensitizer_length = self.photosensitizer['dimensions']['length_A']*angstrom
+            photosensitizer_width = self.photosensitizer['dimensions']['width_A']*angstrom
+            photosensitizer_depth = self.photosensitizer['dimensions']['depth_A']*angstrom
+            photosensitizer_shape = self.photosensitizer['dimensions']['shape']
+            photosensitizer_mw = self.chem_mw.mass(self.photosensitizer['formula']['value'])
 
-        # calculate physical dimensions of the photosensitizer
-        photosensitizer_length = self.photosensitizer['dimensions']['length_A']*angstrom
-        photosensitizer_width = self.photosensitizer['dimensions']['width_A']*angstrom
-        photosensitizer_depth = self.photosensitizer['dimensions']['depth_A']*angstrom
-        photosensitizer_shape = self.photosensitizer['dimensions']['shape']
-        photosensitizer_mw = self.chem_mw.mass(self.photosensitizer['formula']['value'])
-                                          
+            # calculate the volume proportion that is constituted by the photosensitizer, in the volume where the photosensitizer is present        
+            if photosensitizer_shape == 'disc':
+                self.variables['molecular_volume_cub_m'] = cylinder_volume(photosensitizer_length/2, photosensitizer_depth)
+            else:
+                error = f'--> ERROR: The volume formula for the {photosensitizer_shape} shape is not available.'
+                self.messages.append(error)
+                raise ValueError(error)
+                
+            molecules_volume = self.variables['photosensitizers'] * self.variables['molecular_volume_cub_m']
+            self.variables['volume_proportion'] = molecules_volume / self.parameters['solution_cub_m']
+                                                    
         if not self.parameters['surface_system']:
             if photosensitizer_molar is None:
                 error = '--> ERROR: A molar photosensitizer concentration must be defined for systems of dissolved photosensitizers.'
@@ -216,17 +252,6 @@ class PDI():
             self.parameters['solution_cub_m'] = self.parameters['cross_linked_surface_sqr_m']*photosensitizer_length
             self.variables['photosensitizer_molar'] = self.variables['photosensitizers']/N_A / (self.parameters['solution_cub_m']/liter)  
 
-        # calculate the volume proportion that is constituted by the photosensitizer, in the volume where the photosensitizer is present        
-        if photosensitizer_shape == 'disc':
-            self.variables['molecular_volume_cub_m'] = cylinder_volume(photosensitizer_length/2, photosensitizer_depth)
-        else:
-            error = f'--> ERROR: The volume formula for the {photosensitizer_shape} shape is not available.'
-            self.messages.append(error)
-            raise ValueError(error)
-            
-        molecules_volume = self.variables['photosensitizers'] * self.variables['molecular_volume_cub_m']
-        self.variables['volume_proportion'] = molecules_volume / self.parameters['solution_cub_m']
-            
         # print calculated content
         if self.verbose:
             messages = [
@@ -286,30 +311,6 @@ class PDI():
         # completion of the function
         self.defined_model.update({'define_light':True})
         
-    def define_conditions(self,
-                         bacterial_specie: str = None,    # specifies one of the bacteria in the parameters directory of PDI to simulate
-                         bacterial_characteristics: dict = {},      # passes a custom dictionary of characteristics of the simulated bacterium, which can refine characteristics from the bacterial_specie argument
-                         bacterial_cfu_ml: float = 1E6,   # specifies the solution concentration of the simulated bacterium for solution simulations
-                         biofilm: bool = False,          # specifies whether a biofilm simulation will be conducted
-                         photosensitizer: str = 'A3B_4Zn',     # specify which photosensitizer from the predefined options will be simulated
-                         photosensitizer_characteristics: dict = {},   # Custom specifications of the simulation photosensitizer, which can be used to refine the parameterized photosensitizer
-                         photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
-                         photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
-                         cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
-                         light_source: str = None,             # specifies a light source from the predefined options
-                         light_characteristics: dict = {},      # specifies custom characteristics of the light source, in addition to or substitute of a predefined option
-                         measurement: dict = None,              # provides the measurement, in the proper respective units, for the photonic intensity of the light source
-                          ):
-        self._define_bacterium(bacterial_specie, bacterial_characteristics, bacterial_cfu_ml, biofilm)
-        self._define_photosensitizer(photosensitizer, photosensitizer_characteristics, photosensitizer_molar, photosensitizer_g)                         
-        self._define_light(light_source, light_characteristics, measurement)
-        
-        # calculate the time conditions of the simulation
-#        final_exposure = 10/centi**2  #J/m^2
-#        if self.parameters['biofilm']:
-#            final_exposure = 70/centi**2 #J/m^2
-#        self.parameters['total_time_s'] = int(final_exposure/self.parameters['watts']*self.area)
-            
     def _singlet_oxygen_calculations(self,):
         # ensure that all prior functions have completed within this instance
         missing_functions = []
@@ -320,27 +321,27 @@ class PDI():
                 error = f'--> ERROR: The {function} function must be defined before the simulation can execute.'
                 self.messages.append(error)
                 raise SystemError(error)
-                
+
         # define the light watts
         excitation_visible_proportion = (self.parameters['excitation_range_m'] / diff(self.parameters['visible_m']))[0]
         visible_light_watts = self.parameters['watts'] * self.light['visible_proportion']['value']
         effective_excitation_watts = excitation_visible_proportion * visible_light_watts  # homogeneous light intesity throughout the visible spectrum is assumed
-
-        # calculate the quantity of photons from the defined system
-        relative_soret_excitation = 10
-        weighted_average_excitation_wavelength = (self.parameters['q_m']['upper'] + self.parameters['soret_m']['lower']*relative_soret_excitation) / (1+relative_soret_excitation)
+        weighted_average_excitation_wavelength = (self.parameters['q_m']['upper'] + self.parameters['soret_m']['lower']*self.relative_soret_excitation) / (1+relative_soret_excitation)
         joules_per_photon = (h*c) / weighted_average_excitation_wavelength
-        non_reflected_photons = 0.96    
-        non_scattered_photons = exp(-self.solution['extinction_coefficient (1/m)']*self.parameters['solution_depth_m'])
-        self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons*non_scattered_photons/N_A * self.parameters['timestep_s']
-
+        if self.absorbance and self.transmittance == {}:   
+            # calculate the quantity of photons from the defined system
+            non_reflected_photons = 0.96    
+            non_scattered_photons = exp(-self.solution['extinction_coefficient (1/m)']*self.parameters['solution_depth_m'])
+            self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons*non_scattered_photons/N_A * self.parameters['timestep_s']
+        else:
+            self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)/N_A * self.parameters['timestep_s']
         # singlet oxygen calculations
         '''ambient_so = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
 
         if self.verbose:
             messages = [
                     'photons per timestep: ', self.variables['photon_moles_per_timestep'], 
-#                    'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar']), 
+#                   'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar']), 
                     'effective excitation watts: ', sigfigs_conversion(effective_excitation_watts)
                     ]
             
@@ -353,6 +354,34 @@ class PDI():
             self.variables['eps_oxidation'] = self.bacterium['eps_oxidation_rate_constant']['value']         # for reference, 81% eps reduction versus 3-6-log bacterial reduction “Photodynamic Inactivation of Bacterial and Yeast Biofilms With a Cationic Porphyrin” by Beirao et al., 2014
             self.variables['bacterial_biofilm_mass_proportion'] = self.bacterium['cellular_dry_mass_proportion_biofilm']['value']
         
+    def define_conditions(self,
+                         bacterial_specie: str = None,    # specifies one of the bacteria in the parameters directory of PDI to simulate
+                         bacterial_characteristics: dict = {},      # passes a custom dictionary of characteristics of the simulated bacterium, which can refine characteristics from the bacterial_specie argument
+                         bacterial_cfu_ml: float = 1E6,   # specifies the solution concentration of the simulated bacterium for solution simulations
+                         biofilm: bool = False,          # specifies whether a biofilm simulation will be conducted
+                         photosensitizer: str = 'A3B_4Zn',     # specify which photosensitizer from the predefined options will be simulated
+                         photosensitizer_characteristics: dict = {},   # Custom specifications of the simulation photosensitizer, which can be used to refine the parameterized photosensitizer
+                         absorption: dict = {},                 # specify the absorbance of each wavelength for the simulated PS system
+                         transmittance: dict = {},              # specify the transmittance of each wavelength for the simulated PS system
+                         photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
+                         photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
+                         cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
+                         light_source: str = None,             # specifies a light source from the predefined options
+                         light_characteristics: dict = {},      # specifies custom characteristics of the light source, in addition to or substitute of a predefined option
+                         measurement: dict = None,              # provides the measurement, in the proper respective units, for the photonic intensity of the light source
+                          ):
+        self._define_bacterium(bacterial_specie, bacterial_characteristics, bacterial_cfu_ml, biofilm)
+        self._define_photosensitizer(photosensitizer, photosensitizer_characteristics, absorption, transmittance, photosensitizer_molar, photosensitizer_g)                         
+        self._define_light(light_source, light_characteristics, measurement)
+        self._singlet_oxygen_calculations()
+        
+        # calculate the time conditions of the simulation
+#        final_exposure = 10/centi**2  #J/m^2
+#        if self.parameters['biofilm']:
+#            final_exposure = 70/centi**2 #J/m^2
+#        self.parameters['total_time_s'] = int(final_exposure/self.parameters['watts']*self.area)
+            
+       
     def _kinetic_calculation(self,):      
         if ('so_specificity' and 'e_quantum_yield') in self.photosensitizer:
             so_conversion = self.photosensitizer['so_specificity']['value'] 
@@ -366,19 +395,23 @@ class PDI():
             
         # ========== define photosensitizer excitation ===========
         ps = self.variables['photosensitizer_molar']
-        e_fraction = min(
-                1, ((self.variables['photon_moles_per_timestep']*self.variables['volume_proportion']) / (self.variables['photosensitizers']/N_A))
+        if self.absorption or self.transmittance == {}:
+            collision_fraction = self.variables['volume_proportion']
+        else:
+            collision_fraction = self.collided_photons_fraction
+        collision_fraction = min(
+                1, ((self.variables['photon_moles_per_timestep']*collision_fraction) / (self.variables['photosensitizers']/N_A))
                 )
         k_ps_rlx = 1/(self.photosensitizer['ps_decay (ns)']['value']*nano)
         k_e_ps = 1/(self.photosensitizer['ps_rise (fs)']['value']*femto)
-        photosensitizer = f'{k_e_ps}*{e_fraction}*{qy_e}*ps - {k_ps_rlx}*e_ps'
+        photosensitizer = f'{k_e_ps}*{collision_fraction}*{qy_e}*ps - {k_ps_rlx}*e_ps'
             
         # ============== define photobleaching ==============
         k_b_ps = self.photosensitizer['photobleaching_constant (cm2/(J*M))']['value'] * (self.parameters['watts']/(self.area/centi**2))
         self.variables['hv_photobleaching_s'] = 1/k_b_ps
         
         # ============== define singlet oxygen generation ==============
-        mo = 9*milli/self.chem_mw.mass('O2')    # mg/L -> M, ambient water quality criteria for Dissolved Oxygen, EPA   
+        mo = 9*milli/float(self.chem_mw.mass('O2'))   # mg/L -> M, ambient water quality criteria for Dissolved Oxygen, EPA   
         k_so = 1/(self.photosensitizer['ps_charge_transfer (ns)']['value']*nano)
         
         lifetime_logcfu_slope = (40-10)/(8-4) 
@@ -539,6 +572,9 @@ class PDI():
                  figure_title: str = None,             # the figure title
                  y_label: str = 'log10',               # the label of the y-axis for the figure 
                  exposure_axis: bool = False,          # signifying exposure on the x-axis instead of time
+                 experimental_data: dict = {
+                         'x':[], 'y':[]
+                         },                            # The x- and y-values of experimental data that will be plotted with the predicted simulation results
                  display_fa_oxidation: bool = False,   # optionally overlaying the fatty acid oxidation proportion in the figure  
                  display_ps_excitation: bool = False,
                  display_inactivation: bool = True,
@@ -564,7 +600,6 @@ class PDI():
         # calculate the kinetics of the simulation 
         simulation_time = 720
         self.parameters['total_time_s'] = simulation_time*minute
-        self._singlet_oxygen_calculations()
         self._kinetic_calculation()
                     
         # parse the simulation results
@@ -652,6 +687,8 @@ class PDI():
         pyplot.rcParams['figure.dpi'] = 150
         
         self.figure, self.ax = pyplot.subplots()
+        if experimental_data['x'] != []:
+            self.ax.scatter(experimental_data['x'], experimental_data['y'], label = 'Experimental Inactivation')
         if display_inactivation:
             self.ax.plot(xs, self.processed_data['log10-inactivation'], label = 'Inactivation')
         if display_fa_oxidation:
