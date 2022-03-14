@@ -37,16 +37,16 @@ The chemical attributes of the simulated photosensitizer are articulated in the 
 			"reference": null
 		},
 		"ps_rise (fs)": {
-    		 "value": 50,
-    		 "reference": "Anderssonet al., 1999, 'Photoinduced ... State' ; Gurzadyan et al., 1998, 'Time-resolved ... Zn-tetraphenylporphyrin'" 
+    		        "value": 50,
+    		        "reference": "Anderssonet al., 1999, 'Photoinduced ... State' ; Gurzadyan et al., 1998, 'Time-resolved ... Zn-tetraphenylporphyrin'" 
 		},
 		"ps_decay (ns)": {
-    		 "value": 1.5,
-    		 "reference": "Akimoto et al., 1999, 'Ultrafast ... Porphyrins'"
+    		        "value": 1.5,
+    		        "reference": "Akimoto et al., 1999, 'Ultrafast ... Porphyrins'"
 		},
 		"ps_charge_transfer (ns)": {
-    		 "value": 100,
-    		 "reference": "Kupper et al., 2002, 'Kinetics ... Oxygen'" 
+    		        "value": 100,
+    		        "reference": "Kupper et al., 2002, 'Kinetics ... Oxygen'" 
 		},
 		"photobleaching_constant (cm2/(J*M))": {
 			"value": 600,
@@ -92,10 +92,9 @@ Other key:value pairs may be defined to specify references or other notes about 
 		"depth_cm": 1.766,
 		"extinction_coefficient (1/m)":0.013,
 		"dimensions_reference":"https://ca.vwr.com/assetsvc/asset/en_CA/id/25423331/contents/vwr-essential-products-for-tissue-culture.pdf",
-        "coefficient_reference":"The effect of photocarrier generating light on light scattering in the Sea. Lorenzen, 1972"
+                "coefficient_reference":"The effect of photocarrier generating light on light scattering in the Sea. Lorenzen, 1972"
 	}
  }
-
 
 bacteria
 ++++++++++
@@ -159,13 +158,13 @@ This folder contains a different JSON file for each bacterial specie. The only b
       "reference":  "Lewis, C. L., Craig, C. C., & Senecal, A. G. (2014). Mass and density measurements of live and dead Gram-negative and Gram-positive bacterial populations. Applied and environmental microbiology, 80(12), 3622–3631. https://doi.org/10.1128/AEM.00117-14"
   },
     "eps_oxidation_rate_constant":{
-	  "value": 37.75,
-	  "reference": null,
-	  "notes": "This rate constant was empirically determined after calibrating the predictions with the Beirao et al., 2014 paper that constituted one of our examples"
+      "value": 37.75,
+      "reference": null,
+      "notes": "This rate constant was empirically determined after calibrating the predictions with the Beirao et al., 2014 paper that constituted one of our examples"
   },
     "cellular_dry_mass_proportion_biofilm":{
-	  "value": 0.1,
-	  "reference": "The biofilm matrix; Flemming et al.; 2010"
+      "value": 0.1,
+      "reference": "The biofilm matrix; Flemming et al.; 2010"
   }
  }
 
