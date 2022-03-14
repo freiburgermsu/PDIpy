@@ -133,15 +133,13 @@ class PDI():
         self.variables['fa_gL_conc'] = total_proportion = 0
         weighed_mws = []
         for chemical in self.bacterium['membrane_chemicals']:
-            if re.search('FA', chemical):
-                total_proportion += self.bacterium['membrane_chemicals'][chemical]['proportion']['value']
+            total_proportion += self.bacterium['membrane_chemicals'][chemical]['proportion']['value']
         for chemical in self.bacterium['membrane_chemicals']:
-            if re.search('FA', chemical):
-                fa_density_proportion = self.bacterium['membrane_chemicals'][chemical]['density_gL']['value'] * self.bacterium['membrane_chemicals'][chemical]['proportion']['value']
-                self.variables['fa_gL_conc'] += fa_density_proportion
-                mw = average([self.chem_mw.mass(formula) for formula in self.bacterium['membrane_chemicals'][chemical]['formula']])
-                weighed_mws.append(mw*fa_density_proportion/total_proportion)
-        self.variables['fa_molar'] = self.variables['fa_gL_conc'] / average(weighed_mws)
+            fa_density_proportion = self.bacterium['membrane_chemicals'][chemical]['density_gL']['value'] * self.bacterium['membrane_chemicals'][chemical]['proportion']['value']
+            self.variables['fa_gL_conc'] += fa_density_proportion
+            mw = average([self.chem_mw.mass(formula) for formula in self.bacterium['membrane_chemicals'][chemical]['formula']])
+            weighed_mws.append(mw*fa_density_proportion/total_proportion)
+    self.variables['fa_molar'] = self.variables['fa_gL_conc'] / average(weighed_mws)
         
         # calculate the mass proportion of fatty acids in the membrane
         self.variables['cell_radius_m'] = shell_radius(self.bacterium['cell_volume_fL']['value']*femto/liter)
