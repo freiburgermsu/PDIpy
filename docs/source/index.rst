@@ -44,5 +44,6 @@ Contents
 
 .. toctree::
 
+    pdipy_usage
     pdipy_api
     parameter_files
