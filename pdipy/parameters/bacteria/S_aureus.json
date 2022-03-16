@@ -60,5 +60,9 @@
   "cellular_dry_mass_proportion_biofilm":{
 	"value": 0.1,
 	"reference": "The biofilm matrix; Flemming et al.; 2010"
+  },
+  "doubling_rate_constant":{
+	"value": 0.00038441,
+	"reference": "Baines et al.; mBio; 2015"
   }
 }
