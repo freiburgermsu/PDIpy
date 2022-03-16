@@ -442,13 +442,13 @@ class PDI():
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
-             => fa; {k_2x}*fa
-            ps -> e_ps; {photosensitizer}
-            e_ps + mo => so + ps;  {so_conversion}*{k_so}*e_ps*mo
-            ps + so => b_ps ; {k_b_ps}*ps*so
-            so => mo; {k_rlx_so}*so
-            so + fa => o_fa + mo; {k_fa}*so*fa
-            {biofilm}
+            J1: -> fa; {k_2x}*fa
+            J2: ps -> e_ps; {photosensitizer}
+            J3: e_ps + mo => so + ps;  {so_conversion}*{k_so}*e_ps*mo
+            J4: ps + so => b_ps ; {k_b_ps}*ps*so
+            J5: so => mo; {k_rlx_so}*so
+            J6: so + fa => o_fa + mo; {k_fa}*so*fa
+            J7: {biofilm}
 
             # define concentrations
             ps = {ps}
