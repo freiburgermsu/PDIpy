@@ -64,5 +64,9 @@
   "doubling_rate_constant":{
 	"value": 0.00038441,
 	"reference": "Baines et al.; mBio; 2015"
+  },
+  "biofilm_oxidation_fraction_lysis":{
+	"value": 0.0014125,
+	"note": "empirically derived through training with Beirao et al."
   }
 }
