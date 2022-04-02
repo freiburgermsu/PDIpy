@@ -15,7 +15,7 @@ pandas.set_option('max_colwidth', None)
 
 # define useful functions
 def sigfigs_conversion(num, sigfigs_in = 2):
-    return round(num, sigfigs=sigfigs_in, notation = 'sci')
+    return round(num, sigfigs=sigfigs_in, notation = 'sci', warn = False)
 
 def average(num_1, num_2 = None):
     if isnumber(num_1): 
@@ -54,7 +54,6 @@ def isnumber(num):
 class PDI():
     def __init__(self, 
                  solution_dimensions: dict = {}, # defines dimensions of the simulated solution 
-                 surface_system: bool = False,   # specifies whether cross-linked photosensitizer will be simulated
                  well_count: str = 24,        # The petri dish well count that will be simulated, which begets default dimensions of the simulated solution
                  verbose: bool = False,  
                  printing: bool = True,
@@ -73,20 +72,22 @@ class PDI():
         self.chem_mw = ChemMW(printing = False)
         
         # initial parameters
-        self.parameters['surface_system'] = surface_system
         self.parameters['so_diffusion_m'] = 80 * nano       # Moan1990 
         self.parameters['timestep_s'] = 3 * minute
 #         self.parameters['oxidation_angle'] = 5           # degrees
         self.parameters['root_path'] = os.path.dirname(__file__)
         
         # identify options
-        self.bacteria = [re.search('(?<=bacteria\\\\)(.+)(?=\.json)', x).group() for x in glob(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'*.json'))]
-        self.light_parameters = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'light.json'), encoding = 'utf-8'))
-        self.photosensitizers = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'photosensitizers.json'), encoding = 'utf-8'))        
+        self.bacteria = [re.search('(?<=bacteria\\\\)(.+)(?=.json)', x).group() for x in glob(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'*.json'))]
+        with open(os.path.join(self.parameters['root_path'], 'parameters', 'light.json'), encoding = 'utf-8') as light:
+            self.light_parameters = json.load(light)
+        with open(os.path.join(self.parameters['root_path'], 'parameters', 'photosensitizers.json'), encoding = 'utf-8') as ps:
+            self.photosensitizers = json.load(ps)        
                 
         # define the solution 
         well_count = str(well_count)
-        self.solution = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')))[well_count]
+        with open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')) as solution:
+            self.solution = json.load(solution)[well_count]
         
         operational_depth = 0.7  # proportion of well volume that is filled with solution
         self.solution['depth_cm'] = self.solution['depth_cm']*operational_depth
@@ -97,7 +98,7 @@ class PDI():
         self.parameters['solution_depth_m'] = self.solution['depth_cm']*centi
         self.parameters['solution_sqr_m'] = self.solution['area_sqr_cm']*centi**2
         self.parameters['solution_cub_m'] = self.parameters['solution_depth_m']*self.parameters['solution_sqr_m']
-            
+        
         # completion of the function
         self.defined_model.update({'define_system':True})
         
@@ -117,10 +118,12 @@ class PDI():
         self.parameters['biofilm'] = biofilm
         
         # load the bacterial parameters
-        self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', 'S_aureus.json'),encoding='utf-8'))
+        with open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', 'S_aureus.json'),encoding='utf-8') as bacterium:
+            self.bacterium = json.load(bacterium)
         if bacterial_specie in self.bacteria:
             self.parameters['bacterial_specie'] = bacterial_specie
-            self.bacterium = json.load(open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json'),encoding='utf-8'))
+            with open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json'),encoding='utf-8') as bacterium:
+                self.bacterium = json.load(bacterium)
         if bacterial_characteristics != {}:
             for key, value in bacterial_characteristics.items():
                 if key == 'name':
@@ -146,9 +149,8 @@ class PDI():
         membrane_inner_radius = self.variables['cell_radius_m'] - self.bacterium['membrane_thickness_nm']['value']*nano
         self.variables['membrane_cub_m'] = shell_volume(self.variables['cell_radius_m'], membrane_inner_radius)
         
-        fa_g = self.variables['fa_gL_conc']*self.variables['membrane_cub_m']
-        self.variables['fa_mass_proportion'] = fa_g/self.bacterium['cell_mass_pg']['value']*pico    # What is the purpose of this proportion?
-        
+        fa_g = self.variables['fa_gL_conc']*self.variables['membrane_cub_m']/liter
+        self.variables['fa_mass_proportion'] = fa_g/(self.bacterium['cell_mass_pg']['value']*pico)
         # completion of the function
         self.defined_model.update({'define_bacterium':True})
                 
@@ -159,13 +161,16 @@ class PDI():
                                absorbance_nm: dict = {},    # specify the absorbance of each wavelength for the simulated PS system
                                transmittance: dict = {}, # specify the transmittance of each wavelength for the simulated PS system
                                photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
+                               surface_system: bool = False,   # specifies whether cross-linked photosensitizer will be simulated
                                photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
                                cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
+                               area_coverage: float = False # the fraction of the cross-linked surface that is covered with the photosensitizer
                                ):
         def cylinder_volume(radius, height):
             return (radius**2)*pi*height
         
         # define the photosensitizing surface
+        self.parameters['surface_system'] = surface_system
         self.absorbance_nm = {}
         for ab in absorbance_nm:
             if '-' in ab:
@@ -203,9 +208,10 @@ class PDI():
                         self.photosensitizer[key] = {}
                     for key2, value2 in value.items():
                         self.photosensitizer[key][key2] = value2
-                                                       
+                        
         # classify the photonic absorbance characteristics of the photosensitizer
-        photosensitizer_mw = self.chem_mw.mass(self.photosensitizer['formula']['value'])
+        self.chem_mw.mass(self.photosensitizer['formula']['value'])
+        photosensitizer_mw = self.chem_mw.raw_mw
         self.parameters['soret_m'] = {
                 'upper': self.photosensitizer['excitation_nm']['value'][0][1]*nano, 
                 'lower': self.photosensitizer['excitation_nm']['value'][0][0]*nano
@@ -256,6 +262,8 @@ class PDI():
             # calculate the volume proportion that is constituted by the photosensitizer, in the volume where the photosensitizer is present        
             if photosensitizer_shape == 'disc':
                 self.variables['molecular_volume_cub_m'] = cylinder_volume(photosensitizer_length/2, photosensitizer_depth)
+            elif photosensitizer_shape == 'rect':
+                self.variables['molecular_volume_cub_m'] = photosensitizer_width * photosensitizer_length * photosensitizer_depth
             else:
                 error = f'--> ERROR: The volume formula for the {photosensitizer_shape} shape is not available.'
                 self.messages.append(error)
@@ -271,6 +279,12 @@ class PDI():
                 self.variables['photosensitizers'] = (self.variables['photosensitizer_molar']*N_A) * (self.parameters['solution_cub_m']/liter)
             else:
                 self.variables['photosensitizers'] = self.parameters['photosensitizer_g_sqr_m'] / (photosensitizer_mw/N_A) * self.parameters['cross_linked_surface_sqr_m']
+                if area_coverage:  
+                    self.parameters['area_coverage'] = area_coverage
+                    photosensitizers_area = self.parameters['cross_linked_surface_sqr_m'] * self.parameters['cross_linked_surface_sqr_m']
+                    self.parameters['photosensitizer_area'] = average(photosensitizer_width,photosensitizer_length)*average(photosensitizer_depth, max(photosensitizer_width,photosensitizer_length)/2)
+                    self.variables['photosensitizers'] = photosensitizers_area/self.parameters['photosensitizer_area']
+                    
                 self.parameters['solution_cub_m'] = self.parameters['cross_linked_surface_sqr_m']*photosensitizer_length
                 self.variables['photosensitizer_molar'] = self.variables['photosensitizers']/N_A / (self.parameters['solution_cub_m']/liter)  
                 
@@ -346,24 +360,24 @@ class PDI():
         # define the light watts
         excitation_visible_proportion = (self.parameters['excitation_range_m'] / diff(self.parameters['visible_m']))[0]
         visible_light_watts = self.parameters['watts'] * self.light['visible_proportion']['value']
-        effective_excitation_watts = excitation_visible_proportion * visible_light_watts  # homogeneous light intesity throughout the visible spectrum is assumed
+        self.parameters['effective_excitation_watts'] = excitation_visible_proportion * visible_light_watts  # homogeneous light intesity throughout the visible spectrum is assumed
         weighted_average_excitation_wavelength = (self.parameters['q_m']['upper'] + self.parameters['soret_m']['lower']*self.relative_soret_excitation) / (1+self.relative_soret_excitation)
         joules_per_photon = (h*c) / weighted_average_excitation_wavelength
         if self.absorbance_nm == {} and self.transmittance == {}:   
             # calculate the quantity of photons from the defined system
             non_reflected_photons = 0.96    
             non_scattered_photons = exp(-self.solution['extinction_coefficient (1/m)']*self.parameters['solution_depth_m'])
-            self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)*non_reflected_photons*non_scattered_photons/N_A * self.parameters['timestep_s']
+            self.variables['photon_moles_per_timestep'] = (self.parameters['effective_excitation_watts']/joules_per_photon)*non_reflected_photons*non_scattered_photons/N_A * self.parameters['timestep_s']
         else:
-            self.variables['photon_moles_per_timestep'] = (effective_excitation_watts/joules_per_photon)/N_A * self.parameters['timestep_s']
+            self.variables['photon_moles_per_timestep'] = (self.parameters['effective_excitation_watts']/joules_per_photon)/N_A * self.parameters['timestep_s']
         # singlet oxygen calculations
         '''ambient_so = photons_per_second * molecules_dissolved_oxygen * excitation_constant'''
 
         if self.verbose:
             messages = [
-                    'photons per timestep:\t{}'.format(self.variables['photon_moles_per_timestep']), 
+                    'photon moles per timestep:\t{}'.format(self.variables['photon_moles_per_timestep']), 
 #                   'molecular oxygen molecules: ', sigfigs_conversion(self.variables['dissolved_mo_molar']), 
-                    'effective excitation watts:\t{}'.format(sigfigs_conversion(effective_excitation_watts))
+                    'effective excitation watts:\t{}'.format(sigfigs_conversion(self.parameters['effective_excitation_watts']))
                     ]
             
             self.messages.extend(messages)
@@ -385,14 +399,16 @@ class PDI():
                          absorbance_nm: dict = {},                 # specify the absorbance of each wavelength for the simulated PS system
                          transmittance: dict = {},              # specify the transmittance of each wavelength for the simulated PS system
                          photosensitizer_molar: float = None,    # specify the photosensitizer molar concentration for solution simulations
+                         surface_system: bool = False,   # specifies whether cross-linked photosensitizer will be simulated
                          photosensitizer_g: float = 90e-9,        # specify the mass of photosensitizer for cross-linked simulations
                          cross_linked_sqr_m: float = 0.0191134,  # define the cross-linked square-meters for surface simulations
+                         area_coverage: float = False,    # the fraction of the cross-linked surface that is covered with the photosensitizer
                          light_source: str = None,             # specifies a light source from the predefined options
                          light_characteristics: dict = {},      # specifies custom characteristics of the light source, in addition to or substitute of a predefined option
                          measurement: dict = None,              # provides the measurement, in the proper respective units, for the photonic intensity of the light source
                           ):
         self._define_bacterium(bacterial_specie, bacterial_characteristics, bacterial_cfu_ml, biofilm)
-        self._define_photosensitizer(photosensitizer, photosensitizer_characteristics, absorbance_nm, transmittance, photosensitizer_molar, photosensitizer_g)                         
+        self._define_photosensitizer(photosensitizer, photosensitizer_characteristics, absorbance_nm, transmittance, photosensitizer_molar, surface_system, photosensitizer_g, cross_linked_sqr_m, area_coverage)                         
         self._define_light(light_source, light_characteristics, measurement)
         self._singlet_oxygen_calculations()
         
@@ -441,28 +457,28 @@ class PDI():
         k_rlx_so = 1/self.variables['so_decay_time_s']
         
         # ============== define fatty acid and EPS oxidation ==============
-        k_fa = 769                   
+        k_fa = 240                   
         k_fa *= self.variables['fa_gL_conc']
         self.variables['k_fa']  = k_fa
         fa = self.variables['fa_molar']
         if not self.parameters['biofilm']:
-            k_fa_augmentation = (self.parameters['bacterial_cfu_ml']/1E6)**0.3      # empirical factor that considers increasing oxidation rate with greater CFU/mL
-            k_fa *= k_fa_augmentation
+            k_fa *= 13  #!!! The physical meaning of this augmentation must be articulated
+            k_fa *= (1E8/self.parameters['bacterial_cfu_ml'])**0.2      # empirical factor that imposes the intuitive trend of more rapid extinction with low bacterial CFU/mL than high bacterial CFU/mL
         
         biofilm = eps = ''
         if self.parameters['biofilm']:
-            biofilm = 'so + eps => o_eps + mo; {}*so*eps'.format(self.variables['eps_oxidation'])            
-            eps = 'eps = {}'.format((fa/self.variables['fa_mass_proportion'])/self.bacterium['cellular_dry_mass_proportion_biofilm']['value']/N_A)
+            biofilm = 'so + eps => o_eps; {}*so*eps'.format(self.variables['eps_oxidation'])         
+            eps = 'eps = {}'.format((fa/self.variables['fa_mass_proportion'])/self.bacterium['cellular_dry_mass_proportion_biofilm']['value'])
 
         # ============== SBML kinetic model ==============
         self.model = (f'''
           model pdipy_oxidation
             # kinetic expressions
             ps -> e_ps; {photosensitizer}
-            e_ps + mo => so + ps;  {so_conversion}*{k_so}*e_ps*mo
+            e_ps + $mo => so + ps;  {so_conversion}*{k_so}*e_ps*mo
             ps + so => b_ps ; {k_b_ps}*ps*so
-            so => mo; {k_rlx_so}*so
-            so + fa => o_fa + mo; {k_fa}*so*fa
+            so => $mo; {k_rlx_so}*so
+            so + fa => o_fa; {k_fa}*so*fa
             {biofilm}
              => fa; {k_2x}*fa
 
@@ -483,7 +499,7 @@ class PDI():
           end
         ''')       
         # ============== SED-ML plot ==============        
-        total_points = int(self.parameters['total_time_s'] / (3*minute))
+        total_points = int(self.parameters['total_time_s'] / self.parameters['timestep_s'])  # the HillFit method required 3 minute timesteps over 720 minutes
         self.phrasedml_str = '''
           model1 = model "pdipy_oxidation"
           sim1 = simulate uniform(0, {}, {})
@@ -502,15 +518,16 @@ class PDI():
         self.raw_data.index.name = 'Time (s)'
         
         if self.parameters['biofilm']:
-            self.raw_data.columns = ['[ps]', '[e_ps]', '[mo]', '[so]', '[b_ps]', '[fa]', '[ofa]', '[eps]', '[oeps]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[so]', '[b_ps]', '[fa]', '[ofa]', '[eps]', '[oeps]']
         else:
-            self.raw_data.columns = ['[ps]', '[e_ps]', '[mo]', '[so]', '[b_ps]', '[fa]', '[ofa]']
+            self.raw_data.columns = ['[ps]', '[e_ps]', '[so]', '[b_ps]', '[fa]', '[ofa]']
         
         if self.verbose:
             messages = [
                     tellurium_model.getCurrentAntimony(), 
                     f'\nCurrent integrator:\n{tellurium_model.integrator}', 
-                    ] # f'k_fa augmentation factor:{k_fa_augmentation}', 
+                    # f'k_fa augmentation factor:{k_fa_augmentation}',
+                    ]  
             self.messages.extend(messages)
             for message in messages:            
                 print(message)
@@ -547,7 +564,7 @@ class PDI():
         # export the CSVs and regression content
         self.raw_data.to_csv(os.path.join(self.paths['export_path'], 'raw_data.csv'))
         self.processed_data.to_csv(os.path.join(self.paths['export_path'], 'processed_data.csv'))
-        self.hf.export(self.paths['export_path'], 'hillfit-regression')
+#        self.hf.export(self.paths['export_path'], 'hillfit-regression')
         
         # export the figure
         self.figure.savefig(os.path.join(self.paths['export_path'], 'inactivation.svg'))
@@ -590,6 +607,8 @@ class PDI():
                  figure_title: str = None,             # the figure title
                  y_label: str = 'log10',               # the label of the y-axis for the figure 
                  exposure_axis: bool = False,          # signifying exposure on the x-axis instead of time
+                 total_time: float = 720,              # the total simulation time in minutes
+                 timestep: float = 3,                  # the simulation timestep in minutes
                  experimental_data: dict = {
                          'x':[], 'y':[]
                          },                            # The x- and y-values of experimental data that will be plotted with the predicted simulation results
@@ -614,8 +633,8 @@ class PDI():
 #            return count, top_increment
         
         # calculate the kinetics of the simulation 
-        simulation_time = 720
-        self.parameters['total_time_s'] = simulation_time*minute
+        self.parameters['total_time_s'] = total_time*minute
+        self.parameters['timestep_s'] = timestep*minute
         self._kinetic_calculation()
                     
         # parse the simulation results
@@ -624,17 +643,23 @@ class PDI():
         excitation_ys = []
         inactivation_ys = []
         first = True
-        
+        previous_oxidation_proportion = 0
         for index, point in self.raw_data.iterrows():   
-            if first:                                      # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
+            if first: # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
                 first = False
                 continue
+            
             # calculate the oxidation_proportion of the cytoplasmic fatty acids
             oxidation_proportion = point['[ofa]'] / (point['[ofa]']+point['[fa]']) 
             if oxidation_proportion > 1:
                 break
+            if oxidation_ys == []:
+                first_oxidation_proportion = oxidation_proportion
+            if first_oxidation_proportion > oxidation_proportion:
+                warnings.warn('The simulation conditions are insufficient to inactivate the bacteria.')
             oxidation_ys.append(oxidation_proportion)
             
+            # determine the x-axis values
             x_value = index/hour
             if exposure_axis:  # J/cm^2
                 x_value *= self.parameters['watts']*hour/(self.area/centi**2)
@@ -705,11 +730,11 @@ class PDI():
                 print(self.processed_data)   
                         
         # determine the regression equation for the fitted curve via the Hill equation                
-        ys = array(oxidation_ys)
-        if ys[0] >= ys[-1]:
-            raise ValueError(f'The rate of inactivation is less than the rate of reproduction. Change the simulation conditions and attempt another simulation.')  
-        self.hf = HillFit(xs, ys)
-        self.hf.fitting(x_label = index_label, y_label = 'oxidation proportion', view_figure = False)
+#        ys = array(oxidation_ys)
+#        if ys[0] >= ys[-1]:
+#            raise ValueError(f'The rate of inactivation is less than the rate of reproduction. Change the simulation conditions and attempt another simulation.')  
+#        self.hf = HillFit(xs, ys)
+#        self.hf.fitting(x_label = index_label, y_label = 'oxidation proportion', view_figure = False)
         
         # define and refine the fitted Hill equation parameters
 #        for y in reversed(oxidation_ys):
@@ -717,9 +742,11 @@ class PDI():
 #                final_y = y
 #                break
 
-        self.processed_data['inactivation'] = array(oxidation_ys)
+        # extrapolate inactivation from oxidation
         if not self.parameters['biofilm']:
-            count =1
+            self.processed_data['inactivation'] = array(oxidation_ys)
+            # Hill-equation method
+#            count =1
 #            # define parameter changes
 #            num_increments = 8
 #            increments = logspace(-1,-(num_increments+4),ceil(num_increments))*self.hf.top
@@ -740,9 +767,15 @@ class PDI():
 #                    relative_to_limit = 'lesser'
 #                else:
 #                    relative_to_limit = 'greater'
-            self.processed_data['log10-inactivation'] = -log10(1-array(self.processed_data['inactivation'])) + 4
+            
+            # geometric translation method
+            extrapolation = 4.5 + log10(self.parameters['effective_excitation_watts']/0.004314663461538462)
+            if self.parameters['surface_system']:
+                extrapolation = 2
+            self.processed_data['log10-inactivation'] = -log10(1-array(self.processed_data['inactivation'])) + extrapolation
         else:
-            self.processed_data['log10-inactivation'] = -log10(1-array(self.processed_data['inactivation'])) + -log10(
+            # geometric translation method
+            self.processed_data['log10-inactivation'] = -log10(1-array(oxidation_ys)) + -log10(
                     self.bacterium['biofilm_oxidation_fraction_lysis']['value']
                     )
 
@@ -751,10 +784,10 @@ class PDI():
         self.ax.legend(loc = 'lower center')
 
         if self.verbose:
-            if not self.parameters['biofilm']:
-                message = f'The oxidation data was refined into inactivation data after {count} loops'
-                print(message)
-                self.messages.append(message)
+#            if not self.parameters['biofilm']:
+#                message = f'The oxidation data was refined into inactivation data after {count} loops'
+#                print(message)
+#                self.messages.append(message)
             
             if self.jupyter:
                 display(self.raw_data)
@@ -781,7 +814,6 @@ class PDI():
                         unit = 'hours'
                         message = f'{unit} to target: {value}'
                         break
-                print(log_reduction, self.processed_data['log10-inactivation'])
                 print(message)
         elif isnumber(target_hours):
             if target_hours > self.processed_data.index[-1]:
