@@ -104,7 +104,7 @@ class PDI():
         
                 
     def _define_bacterium(self, 
-                         bacterial_specie: str = None,    # specifies one of the bacteria in the parameters directory of PDI to simulate
+                         bacterial_specie: str = 'S_aureus',    # specifies one of the bacteria in the parameters directory of PDI to simulate
                          bacterial_characteristics: dict = {},      # passes a custom dictionary of characteristics of the simulated bacterium, which can refine characteristics from the bacterial_specie argument
                          bacterial_cfu_ml: float = 1E6,   # specifies the solution concentration of the simulated bacterium for solution simulations
                          biofilm: bool = False,          # specifies whether a biofilm simulation will be conducted
@@ -118,12 +118,9 @@ class PDI():
         self.parameters['biofilm'] = biofilm
         
         # load the bacterial parameters
-        with open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', 'S_aureus.json'),encoding='utf-8') as bacterium:
+        self.parameters['bacterial_specie'] = bacterial_specie
+        with open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{self.parameters["bacterial_specie"]}.json'),encoding='utf-8') as bacterium:
             self.bacterium = json.load(bacterium)
-        if bacterial_specie in self.bacteria:
-            self.parameters['bacterial_specie'] = bacterial_specie
-            with open(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'{bacterial_specie}.json'),encoding='utf-8') as bacterium:
-                self.bacterium = json.load(bacterium)
         if bacterial_characteristics != {}:
             for key, value in bacterial_characteristics.items():
                 if key == 'name':
@@ -390,7 +387,7 @@ class PDI():
             self.variables['bacterial_biofilm_mass_proportion'] = self.bacterium['cellular_dry_mass_proportion_biofilm']['value']
         
     def define_conditions(self,
-                         bacterial_specie: str = None,    # specifies one of the bacteria in the parameters directory of PDI to simulate
+                         bacterial_specie: str = 'S_aureus',    # specifies one of the bacteria in the parameters directory of PDI to simulate
                          bacterial_characteristics: dict = {},      # passes a custom dictionary of characteristics of the simulated bacterium, which can refine characteristics from the bacterial_specie argument
                          bacterial_cfu_ml: float = 1E6,   # specifies the solution concentration of the simulated bacterium for solution simulations
                          biofilm: bool = False,          # specifies whether a biofilm simulation will be conducted

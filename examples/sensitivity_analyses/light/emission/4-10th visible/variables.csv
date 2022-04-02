@@ -1,0 +1,15 @@
+,variable,value
+0,fa_gL_conc,9.1352E-1
+1,fa_molar,1.0976E-2
+2,cell_radius_m,6.0676E-5
+3,membrane_cub_m,1.8504E-16
+4,fa_mass_proportion,1.6130E-1
+5,molecular_volume_cub_m,1.2674E-27
+6,photosensitizer_molar,5.0000E-6
+7,photosensitizers,7.3630E15
+8,volume_proportion,3.8164E-6
+9,photon_moles_per_timestep,1.0871E-6
+10,hv_photobleaching_s,4.1667E-1
+11,so_decay_time_s,4.5000E-5
+12,k_fa,2.1924E2
+13,simulation_path,C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\sensitivity_analyses\light\spectrum\4-10th visible
