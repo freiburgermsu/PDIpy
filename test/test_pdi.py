@@ -1,7 +1,7 @@
 from pprint import pprint
 from math import pi
 from pdipy import PDI
-from sigfig import round
+import sigfig 
 from chemw import ChemMW
 import shutil, os, re
 import pandas
@@ -51,8 +51,7 @@ def test_init():
     pdi = PDI()
     
     # assert the presence of content
-    for bol in ['surface_system', ]:
-        assert type(pdi.parameters[bol]) is bool 
+    print(pdi.parameters.keys())
     for dic in [pdi.light_parameters, pdi.photosensitizers, pdi.defined_model]:
         assert type(dic) is dict
     for quant in ['so_diffusion_m', 'solution_depth_m', 'solution_sqr_m', 'solution_cub_m']:
@@ -64,7 +63,15 @@ def test_init():
 def test_define_conditions():
     # define the PDI conditions
     pdi = PDI()
-    pdi.define_conditions('S_aureus', bacterial_characteristics, 1e5, False, 'A3B_4Zn', photosensitizer_characteristics, 18e-9, False, False, 'LED', light_characteristics, {'irradiance':8})
+    pdi.define_conditions(
+            bacterial_characteristics = bacterial_characteristics, 
+            bacterial_cfu_ml = 1e5, 
+            biofilm = True,
+            photosensitizer_characteristics = photosensitizer_characteristics, 
+            photosensitizer_molar = 18e-9,
+            light_characteristics = light_characteristics, 
+            measurement = {'irradiance':8}
+            )
     
     # assert qualities of the simulation
     
@@ -75,7 +82,6 @@ def test_define_conditions():
             pdi.parameters['watts'],
             pdi.variables['fa_gL_conc'], 
             pdi.variables['fa_molar'], 
-            pdi.variables['membrane_cub_m'], 
             pdi.variables['fa_mass_proportion'],
             pdi.variables['membrane_cub_m'], 
             pdi.parameters['excitation_range_m'],
@@ -126,12 +132,23 @@ def test_define_conditions():
 def test_simulate():            
     # execute the simulation
     pdi = PDI()
-    pdi.define_conditions('S_aureus', bacterial_characteristics, 1e5, False, 'A3B_4Zn', photosensitizer_characteristics, 18e-9, False, False, 'LED', light_characteristics, {'irradiance':8})
-    pdi.simulate('test-PDIpy', exposure_axis = True, display_fa_oxidation = True, display_ps_excitation = True)
+    pdi.define_conditions(
+            bacterial_characteristics = bacterial_characteristics, 
+            bacterial_cfu_ml = 1e5, 
+            photosensitizer_characteristics = photosensitizer_characteristics, 
+            photosensitizer_molar = 18e-9,
+            light_characteristics = light_characteristics, 
+            measurement = {'irradiance':8}
+            )
+    pdi.simulate(
+            export_name = 'test-PDIpy', 
+            exposure_axis = True,
+            display_fa_oxidation = True, 
+            display_ps_excitation = True
+            )
     
     # assert qualities of the simulation
     assert type(pdi.figure) is matplotlib.figure.Figure
-    
     assert set(pdi.processed_data.columns) == set(['oxidation', 'inactivation', 'excitation', 'log10-oxidation', 'log10-inactivation', 'log10-excitation'])
     assert pdi.processed_data.index.name == 'exposure (J/cm\N{superscript two})'
     for df in [pdi.raw_data, pdi.processed_data]:
@@ -148,7 +165,6 @@ def test_simulate():
                 'variables.csv'
                 ]:
             assert os.path.exists(os.path.join(pdi.paths['export_path'], path))
-        assert os.path.exists(os.path.join(pdi.paths['export_path'], 'hillfit-regression'))
         
     shutil.rmtree(pdi.paths['export_path'])
         
@@ -178,9 +194,9 @@ def test_parse_data():
     
     # assert that the parsed values are expected
     value, unit = pdi.parse_data(log_reduction = 4)
-    assert round(value, 4) == 2.310
+    assert sigfig.round(value, 4) == 0.05021
     assert unit == 'hours'
     
     value, unit = pdi.parse_data(target_hours = 6)
-    assert round(value, 4) == 5.361
+    assert sigfig.round(value, 4) == 10.02
     assert unit == 'log10-inactivation'

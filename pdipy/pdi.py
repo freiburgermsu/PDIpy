@@ -53,7 +53,7 @@ def isnumber(num):
 class PDI():
     def __init__(self, 
                  solution_dimensions: dict = {}, # defines dimensions of the simulated solution 
-                 well_count: str = 24,           # The well count size of the simulated petri dish, if a petri dish will be simulated
+                 well_count: str = '24',           # The well count size of the simulated petri dish, if a petri dish will be simulated
                  verbose: bool = False,  
                  printing: bool = True,
                  jupyter: bool = False
@@ -80,11 +80,11 @@ class PDI():
             self.photosensitizers = json.load(ps)        
                 
         # define the solution 
+        with open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')) as solution:
+            self.solution = json.load(solution)[well_count]
         operational_depth = 0.7  # proportion of well volume that is filled with solution
         self.solution['depth_cm'] = self.solution['depth_cm']*operational_depth
         well_count = str(well_count)
-        with open(os.path.join(self.parameters['root_path'], 'parameters', 'wells.json')) as solution:
-            self.solution = json.load(solution)[well_count]
         if solution_dimensions != {}:
             for key, value in solution_dimensions.items():
                 self.solution[key] = value
