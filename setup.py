@@ -12,9 +12,9 @@ setup(
           'pdipy': ['parameters/*'],
           'test': ['./*']
           }, 
-  version = '0.0.4',
+  version = '0.0.5',
   license = 'MIT',
-  description = "Simulate Photodynamic Inactivation (PDI) of a Cocci Bacterium from a kinetics model of membrane oxidation.", 
+  description = "Simulate Photodynamic Inactivation (PDI) of from a kinetics model of membrane oxidation.", 
   long_description = readme,
   author = 'Andrew Freiburger',               
   author_email = 'andrewfreiburger@gmail.com',

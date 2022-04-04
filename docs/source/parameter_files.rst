@@ -1,7 +1,7 @@
 PDIpy parameter files
 -----------------------
 
-Parameters may be more succinctly provided through JSON files, which are automatically imported by the code, than through function arguments; although, the function arguments can complement parameters from these JSON files. Each JSON file pertains to a distinct category of simulation parameters, which are individually detailed in the following sections.
+Parameters may be more succinctly provided through comprehensive JSON files, which are automatically imported by the code, than through function arguments; although, these parameter sources are complementary. Each JSON file pertains to a distinct category of simulation parameters, which are individually detailed in the following sections.
 
 
 photosensitizers
@@ -62,9 +62,9 @@ The chemical attributes of the simulated photosensitizer are articulated in the 
 	}
 
 
-- *e_quantum_yield*, *so_specificity*, & *so_quantum_yield* ``float``: quantum yields of the photosensitizer (PS). The ``e_quantum_yield`` and ``so_specificity`` quantum yields correspond to the excitation of a PS after collision with a photon and the generation of singlet oxygen (SO) by that excited PS, respectively. The ``so_quantum_yield`` quatum yield is the collective probability, and thus the product, of the two aforementioned quantum yields, and is disaggregated into estimates of the first two quantum yields by simply taking the square-root of ``so_quantum_yield``.
+- *e_quantum_yield*, *so_specificity*, & *so_quantum_yield* ``float``: quantum yields of the photosensitizer (PS). The ``e_quantum_yield`` and ``so_specificity`` quantum yields correspond to the excitation of a PS after collision with a photon and the generation of singlet oxygen (SO) by that excited PS, respectively. The ``so_quantum_yield`` quatum yield is the collective probability, and thus the product, of the two aforementioned quantum yields, and is disaggregated into estimates of the first two quantum yields by simply taking its square-root.
 - *formula* ``str``: defines the chemical formula of the PS, where underscores may optionally separate elements to improve readability.
-- *excitation_nm* ``2D-array``: specifies the excitation range in nanometers of the Soret and the Q bands, respectively, of the porphyrin PS.
+- *excitation_nm* ``2D-array``: specifies the excitation range(s) of the photosensitizer in nanometers. 
 - *ps_rise (fs)* & *ps_decay (ns)* ``float``: specifies the excitation and fluorescence times in units of femtoseconds and nanoseconds, respectively, for the PS.
 - *ps_charge_transfer (ns)* ``float``: specifies the average time after a photon collision when the excited PS relays excitation energy to another molecule, ideally tripley oxygen.  
 - *photobleaching_constant (cm2/(J*M))* ``float``: specifies the rate constant of the oxygen-dependent photobleaching reaction for the PS.
@@ -78,12 +78,6 @@ wells
 
 The dimensions of the solution in which the PDI simulation is conducted may be described through the ``wells.json`` file, in addition to the function argument. The default entries of this file reflect standard dimensions of individual wells in the 6-, 12-, 24-, 48-, and 96-well bioassay plates; however, any solution can be defined that provides the ``area_sqr_cm``, ``depth_cm``, and ``extinction_coefficient (1/m)`` parameters. 
 
-- *area_sqr_cm* ``float``: specifies the area on the bottom of the simulated solution, in units of cm\ :sup:`2`\.
-- *depth_cm* ``float``: specifies the depth of the simulated solution, in units of cm.
-- *extinction_coefficient (1/m)* ``float``: specifies the rate constant for the scattering of light through the solution, as a function of depth, via the light attenuation equation: remaining fraction = e\ :sup:`(-k*z)`\.
-
-Other key:value pairs may be defined to specify references or other notes about the system. A sample entry in the ``wells.json`` file is provided below:
-
 .. code-block:: json
 
  {
@@ -95,6 +89,12 @@ Other key:value pairs may be defined to specify references or other notes about 
                 "coefficient_reference":"The effect of photocarrier generating light on light scattering in the Sea. Lorenzen, 1972"
 	}
  }
+
+Other key:value pairs may be defined to specify references or other notes about the system. A sample entry in the ``wells.json`` file is provided below:
+
+- *area_sqr_cm* ``float``: specifies the area on the bottom of the simulated solution, in units of cm\ :sup:`2`\.
+- *depth_cm* ``float``: specifies the depth (height) of the simulated solution, in units of cm.
+- *extinction_coefficient (1/m)* ``float``: specifies the rate constant for the scattering of light through the solution, as a function of depth, via the light attenuation equation: remaining fraction = e\ :sup:`(-k*z)`\.
 
 bacteria
 ++++++++++
@@ -163,8 +163,16 @@ This folder contains a different JSON file for each bacterial specie. The only b
       "notes": "This rate constant was empirically determined after calibrating the predictions with the Beirao et al., 2014 paper that constituted one of our examples"
   },
     "cellular_dry_mass_proportion_biofilm":{
-      "value": 0.1,
-      "reference": "The biofilm matrix; Flemming et al.; 2010"
+	  "value": 0.1,
+	  "reference": "The biofilm matrix; Flemming et al.; 2010"
+  },
+    "doubling_rate_constant":{
+	  "value": 0.00038441,
+	  "reference": "Baines et al.; mBio; 2015"
+  },
+    "biofilm_oxidation_fraction_lysis":{
+	  "value": 0.0014125,
+	  "note": "empirically derived through training with Beirao et al."
   }
  }
 
@@ -173,13 +181,15 @@ This folder contains a different JSON file for each bacterial specie. The only b
 - *cell_mass_pg* & *cell_volume_fL* ``dict``: specifies the mass and volume of the bacterial cell in picograms and femtoliters, respectively.
 - *eps_oxidation_rate_constant* ``dict``: defines the rate constant of oxidizing the extracellular polymeric substance for biofilm simulations of this organism.
 - *cellular_dry_mass_proportion_biofilm* ``dict``: defines the ratio of biofilm mass that is comprised of cellular dry mass.  
+- *doubling_rate_constant* ``dict``: specifies the rate constant at which the bacteria doubles
+- *biofilm_oxidation_fraction_lysis* ``dict``: specifies the threshold of membrane oxidation that manifests in cellular lysis.
 
 The ``reference`` and ``notes`` keys are optional in each sub-dictionary, as are other keys of metadata at the user's discretion.
 
 light
 +++++++
  
-The emission spectrum and visual intensity per energy input are defined through the ``light.json`` file, in addition to the function argument, for the incident light source of the simulated system. The default entries of this file reflect ``incandescent``, ``LED``, and ``fluorescent`` light sources; however, other light sources can be defined by emulating the same syntactic structure. The values of each sub-dictionary are stored in the ``value`` key.
+The emission spectrum and visual intensity per energy input of the simulated light source are defined through the ``light.json`` file, complementarily to the function argument. The default light sources are ``incandescent``, ``LED``, and ``fluorescent``; however, other light sources can be defined by emulating the same syntactic structure. The values of each sub-dictionary are stored in the ``value`` key.
       
 .. code-block:: json
       
@@ -197,4 +207,4 @@ The emission spectrum and visual intensity per energy input are defined through 
  }
 	  
 - *visible_proportion* ``dict``: specifies proportion of the emission spectrum that resides within the visible region.
-- *lumens_per_watt* ``dict``: specifies the visual lumens that are emitted per watt of energy. This is used to convert between parameterized light intensity in units of lux or lumens into watts, which is necessary for subsequent calculations of incident photons.
+- *lumens_per_watt* ``dict``: specifies the visual lumens that are emitted per watt of energy. This is used to convert between parameterized light intensity in units of lux or lumens into watts, which is the necessary unit for subsequent PDIpy calculations.

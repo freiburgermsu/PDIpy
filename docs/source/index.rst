@@ -1,4 +1,4 @@
-Simulating Photodynamic Inactivation of a Cocci bacterium 
+Simulating Photodynamic Inactivation (PDI) from chemical kinetics
 ------------------------------------------------------------------------
 
 |PyPI version| |Actions Status| |Downloads| |License|
@@ -19,14 +19,14 @@ Simulating Photodynamic Inactivation of a Cocci bacterium
    :target: https://pepy.tech/project/pdipy
    :alt: Downloads
 
-Antibiotic resistance is developing medical crisis that is projected to surpass cancer in annual deaths by mid-21st century. Photodynamic Inactivation (PDI) is a promising treatment method that escapes resistance evolution and may be an essential technology to hamper the growing threat of resistant pathogens. The requisite rate of research to mitigate these somber projections requires computational tools that can improve and expedite experimental research in developing PDI treatments.
+Antibiotic resistance is a developing medical crisis that is projected to surpass cancer in annual deaths by mid-21st century. Photodynamic Inactivation (PDI) escapes resistance evolution and may therefore be an essential antibiotic method to hamper the growing threat of resistant pathogens. The requisite rate of research to mitigate these somber projections requires computational tools that can improve and expedite experimental research in developing PDI treatments.
 
-`PDIpy <https://pypi.org/project/pdipy/>`_ is offered as the first comprehensive software of PDI to fulfill this by simulating PDI biochemistry from a chemical kinetics model. PDIpy accepts user inputs of an experimental system, executes a `Tellurium <https://tellurium.readthedocs.io/en/latest/walkthrough.html>`_ kinetic system, and expresses and exports the results through CSV spreadsheets and SVG images. Post-processing of the simulation data is further supported with a function that parses the based upon user parameters. The `examples directory <https://github.com/freiburgermsu/pdipy/examples>`_ of the PDIpy GitHub exemplifies PDIpy through replicating experimental observations. Users and developers are encouraged to critique and improve PDIpy, as an open-source library, through `GitHub issues <https://github.com/freiburgermsu/pdipy/issues>`_. 
+`PDIpy <https://pypi.org/project/pdipy/>`_ is the first comprehensive software of PDI that simulates PDI biochemistry from a chemical kinetics model. PDIpy accepts user inputs of the simulated system, constructs and executes a `Tellurium <https://tellurium.readthedocs.io/en/latest/walkthrough.html>`_ kinetic system, and processes and exports the results in spreadsheets and SVG figures. Investigation of the simulation data is further supported with a PDIpy function that parses the data based upon either a specified inactivation or time. The `examples directory <https://github.com/freiburgermsu/pdipy/examples>`_ of the PDIpy GitHub exemplifies PDIpy through replicating experimental observations and conducting multiple sensitivity analyses. Users and developers are encouraged to critique, improve, and join the open-source project through `GitHub issues <https://github.com/freiburgermsu/pdipy/issues>`_ or emailing afreiburger@uvic.ca, respectively. 
 
 
 .. note::
 
-   This project is under active development.
+   This project is under active development, and may therefore be subject to incompatible changes in the API. We seek to minimize these types of upgrades.
 
 
 ++++++++++++++++++++++

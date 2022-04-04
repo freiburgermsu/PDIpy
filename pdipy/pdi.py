@@ -52,7 +52,7 @@ def isnumber(num):
 
 class PDI():
     def __init__(self, 
-                 solution_dimensions: dict = {}, # defines dimensions of the simulated solution 
+                 solution_dimensions: dict = {},   # defines dimensions of the simulated solution 
                  well_count: str = '24',           # The well count size of the simulated petri dish, if a petri dish will be simulated
                  verbose: bool = False,  
                  printing: bool = True,

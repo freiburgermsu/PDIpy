@@ -7,7 +7,7 @@ copyright = '2022, Andrew Philip Freiburger'
 author = 'Andrew Philip Freiburger'
 
 release = '1'
-version = '0.0.3'
+version = '0.0.5'
 
 # -- General configuration
 #
