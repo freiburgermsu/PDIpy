@@ -1,7 +1,7 @@
 Simulating Photodynamic Inactivation (PDI) from chemical kinetics
 ------------------------------------------------------------------------
 
-|PyPI version| |Actions Status| |Downloads| |License|
+|PyPI version| |Actions Status| |docs| |Downloads| |License|
 
 .. |PyPI version| image:: https://img.shields.io/pypi/v/pdipy.svg?logo=PyPI&logoColor=brightgreen
    :target: https://pypi.org/project/pdipy/
@@ -18,6 +18,10 @@ Simulating Photodynamic Inactivation (PDI) from chemical kinetics
 .. |Downloads| image:: https://pepy.tech/badge/pdipy
    :target: https://pepy.tech/project/pdipy
    :alt: Downloads
+   
+.. |docs| image:: https://readthedocs.org/projects/pdipy/badge/?version=latest
+   :target: https://pdipy.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
 
 Antibiotic resistance is a developing medical crisis that is projected to surpass cancer in annual deaths by mid-21st century. Photodynamic Inactivation (PDI) escapes resistance evolution and may therefore be an essential antibiotic method to hamper the growing threat of resistant pathogens. The requisite rate of research to mitigate these somber projections requires computational tools that can improve and expedite experimental research in developing PDI treatments.
 

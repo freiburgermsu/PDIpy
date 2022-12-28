@@ -8,7 +8,7 @@
 6,photosensitizer_molar,5.0000E-6
 7,photosensitizers,7.3630E15
 8,volume_proportion,3.8164E-6
-9,photon_moles_per_timestep,2.6328E-6
+9,photon_moles_per_timestep,2.6330E-6
 10,eps_oxidation,3.7750E1
 11,bacterial_biofilm_mass_proportion,1.0000E-1
 12,hv_photobleaching_s,4.1667E-1

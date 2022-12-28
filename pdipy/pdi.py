@@ -75,7 +75,7 @@ class PDI():
         # identify predefined parameter options
         self.bacteria = [re.search(r'(?<=bacteria\\)(.+)(?=.json)', x).group() for x in glob(os.path.join(self.parameters['root_path'], 'parameters', 'bacteria', f'*.json'))]
         with open(os.path.join(self.parameters['root_path'], 'parameters', 'light.json'), encoding = 'utf-8') as light:
-            self.light_parameters = json.load(light)
+            self.light_sources = json.load(light)
         with open(os.path.join(self.parameters['root_path'], 'parameters', 'photosensitizers.json'), encoding = 'utf-8') as ps:
             self.photosensitizers = json.load(ps)        
                 
@@ -192,7 +192,9 @@ class PDI():
             
         # load and refine photosensitizer parameters
         self.parameters['photosensitizer_selection'] = photosensitizer
-        self.photosensitizer = self.photosensitizers[photosensitizer]             
+        self.photosensitizer = self.photosensitizers['A3B_4Zn']
+        if photosensitizer in self.photosensitizers:
+            self.photosensitizer = self.photosensitizers[photosensitizer]
         if photosensitizer_characteristics != {}:
             for key, value in photosensitizer_characteristics.items():
                 if key == 'name':
@@ -316,7 +318,9 @@ class PDI():
         
         # define properties of the light source
         self.parameters['light_source'] = light_source
-        self.light = self.light_parameters[self.parameters['light_source']]            
+        self.light = self.light_sources['LED']
+        if self.parameters['light_source'] in self.light_sources:
+            self.light = self.light_sources[self.parameters['light_source']]
         if light_characteristics != {}:
             for key, value in light_characteristics.items():                 
                 self.light[key] = value
@@ -585,7 +589,7 @@ class PDI():
                  export_name: str = None,
                  export_directory: str = None,
                  figure_title: str = None,             # the figure title
-                 y_label: str = 'log10',               # the label of the y-axis for the figure 
+                 y_label: str = 'Proportion of total (log10)',  # the label of the y-axis for the figure 
                  exposure_axis: bool = False,          # signifying exposure on the x-axis instead of time
                  total_time: float = 720,              # the total simulation time in minutes
                  timestep: float = 3,                  # the simulation timestep in minutes
@@ -618,7 +622,7 @@ class PDI():
         self._kinetic_calculation()
                     
         # parse the simulation results
-        x_values, oxidation_ys, excitation_ys, inactivation_ys = [], [], [], []
+        x_values, oxidation_ys, excitation_ys, inactivation_ys = [], [], [], []   # !!! never used inactivation_ys
         first = True
         for index, point in self.raw_data.iterrows():   
             if first: # The inital point of 0,0 crashes the regression of HillFit, and thus it is skipped
@@ -646,7 +650,7 @@ class PDI():
 
         # create the DataFrame of processed data  
         xs = array(x_values)   
-        index_label = 'time (hr)'
+        index_label = 'Time (h)'
         if exposure_axis:  # J/cm^2
             xs *= self.parameters['watts']*hour/(self.area/centi**2)
             index_label = 'exposure (J/cm\N{superscript two})'
@@ -664,28 +668,29 @@ class PDI():
         pyplot.rcParams['figure.dpi'] = 150
         
         self.figure, self.ax = pyplot.subplots()
+        plots = []
+        labels = []
         if display_fa_oxidation:
-            self.ax.plot(xs, self.processed_data['log10-oxidation'], label = 'Oxidation')
-        if experimental_data['x'] != []:
-            self.ax.scatter(experimental_data['x'], experimental_data['y'], label = 'Experimental Inactivation')
+            plot, = self.ax.plot(xs, self.processed_data['log10-oxidation'], label = 'Oxidation', color = 'r')
+            plots.append(plot)
         if display_ps_excitation:
             if not display_fa_oxidation and not display_inactivation:
                 self.ax.set_ylabel('Photosensitizer excitation proportion')
                 self.ax.set_xlabel(index_label)
-                self.ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
+                plot, = self.ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g', linestyle='dashed')
                 self.ax.set_ylim(
                     min(self.processed_data['excitation'])-.05,
                     min(1,max(self.processed_data['excitation']))+.05
                     )
             else:
                 sec_ax = self.ax.twinx()
-                sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g')
+                plot, = sec_ax.plot(xs, self.processed_data['excitation'], label = 'Excitation', color = 'g', linestyle='dashed')
                 sec_ax.set_ylabel('Photosensitizer excitation proportion', color = 'g')
                 sec_ax.set_ylim(
                     min(self.processed_data['excitation'])-.05,
                     min(1,max(self.processed_data['excitation']))+.05
-                    )
-                sec_ax.legend(loc = 'lower right')            
+                    )    
+            plots.append(plot)
         if figure_title is None:
             figure_title = 'Cytoplasmic oxidation and inactivation of {}'.format(self.parameters['bacterial_specie'])
         self.ax.set_title(figure_title)
@@ -693,7 +698,6 @@ class PDI():
         if display_inactivation or display_fa_oxidation:
             self.ax.set_ylabel(y_label)
             self.ax.set_xlabel(index_label)
-            self.ax.legend(loc = 'lower center')    
 
         if self.printing:
             if self.jupyter:
@@ -750,9 +754,13 @@ class PDI():
                 extrapolation = 2
             self.processed_data['log10-inactivation'] = -log10(1-array(self.processed_data['inactivation'])) + extrapolation
 
+        if experimental_data['x'] != []:
+            plot, = self.ax.scatter(experimental_data['x'], experimental_data['y'], label = 'Experimental', color = 'b')
+            plots.append(plot)
         if display_inactivation:
-            self.ax.plot(xs, self.processed_data['log10-inactivation'], label = 'Inactivation')
-        self.ax.legend(loc = 'lower center')
+            plot, = self.ax.plot(xs, self.processed_data['log10-inactivation'], label = 'Inactivation', color = 'b')
+            plots.append(plot)
+        self.ax.legend(handles = plots, loc = 'lower center', title = 'Model predictions')
 
         if self.verbose:
             # for the Hill-equation method

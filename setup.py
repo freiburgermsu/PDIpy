@@ -10,11 +10,11 @@ setup(
   packages = find_packages(),
   package_data = {
           'pdipy': ['parameters/*'],
-          'test': ['./*']
+          'test': ['*']
           }, 
   version = '0.0.5',
   license = 'MIT',
-  description = "Simulate Photodynamic Inactivation (PDI) of from a kinetics model of membrane oxidation.", 
+  description = "Simulate Photodynamic Inactivation (PDI) from a kinetics model of membrane oxidation.", 
   long_description = readme,
   author = 'Andrew Freiburger',               
   author_email = 'andrewfreiburger@gmail.com',

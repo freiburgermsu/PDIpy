@@ -9,12 +9,13 @@
 7,biofilm,False
 8,bacterial_specie,S_aureus
 9,surface_system,False
-10,soret_m,"{'upper': 4.3e-07, 'lower': 4.0000000000000003e-07}"
-11,q_m,"{'upper': 6.25e-07, 'lower': 5.3e-07}"
-12,excitation_range_m,2.2500E-7
-13,visible_m,"[3.9e-07, 7.8e-07]"
-14,light_source,OSRAM 2' 18W/840 lamps
-15,watts,7.7200E-3
-16,effective_excitation_watts,4.3147E-3
-17,total_time_s,4.3200E4
-18,simulation_path,"C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\Beirao_et_al\Beirao_et_al, 20 uM solution"
+10,photosensitizer_selection,"5,10,15,20-tetrakis(1-methylpyridinium-4-yl)porphyrin tetra-iodide"
+11,soret_m,"{'upper': 4.3e-07, 'lower': 4.0000000000000003e-07}"
+12,q_m,"{'upper': 6.25e-07, 'lower': 5.3e-07}"
+13,excitation_range_m,2.2500E-7
+14,visible_m,"[3.9e-07, 7.8e-07]"
+15,light_source,OSRAM 2' 18W/840 lamps
+16,watts,7.7200E-3
+17,effective_excitation_watts,4.3147E-3
+18,total_time_s,4.3200E4
+19,simulation_path,"C:\Users\Andrew Freiburger\Dropbox\My PC (DESKTOP-M302P50)\Documents\UVic Civil Engineering\PDIpy\PDIpy\examples\Beirao_et_al\Beirao_et_al, 20 uM solution"
